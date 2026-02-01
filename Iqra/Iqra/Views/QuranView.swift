@@ -17,15 +17,9 @@ struct QuranView: View {
         NavigationStack {
             Group {
                 if catalogService.isLoading && catalogService.tracks.isEmpty {
-                    ProgressView("Loading catalog...")
+                    loadingView
                 } else if catalogService.tracks.isEmpty {
-                    ContentUnavailableView {
-                        Label("No Tracks", systemImage: "book.closed")
-                    } description: {
-                        Text(catalogService.errorMessage ?? "Pull to refresh")
-                    } actions: {
-                        Button("Refresh") { Task { await catalogService.fetchCatalog() } }
-                    }
+                    emptyStateView
                 } else {
                     List {
                         ForEach(filteredTracks) { track in
@@ -37,15 +31,48 @@ struct QuranView: View {
                                 onPlay: { playerService.play(track) },
                                 onDownload: { Task { try? await downloadManager.download(track, modelContext: modelContext) } }
                             )
+                            .listRowBackground(Color.clear)
                         }
                     }
                     .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .background(Theme.background)
                 }
             }
+            .background(Theme.background)
             .navigationTitle("Quran")
             .searchable(text: $searchText, prompt: "Search surahs")
             .refreshable { await catalogService.fetchCatalog() }
+            .toolbarBackground(Theme.background, for: .navigationBar)
         }
+    }
+    
+    private var loadingView: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .tint(Theme.accent)
+            Text("Loading catalog...")
+                .foregroundStyle(Theme.textSecondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.background)
+    }
+    
+    private var emptyStateView: some View {
+        ContentUnavailableView {
+            Label("No Tracks", systemImage: "book.closed")
+                .foregroundStyle(Theme.accent)
+        } description: {
+            Text(catalogService.errorMessage ?? "Pull to refresh")
+                .foregroundStyle(Theme.textSecondary)
+        } actions: {
+            Button("Refresh") {
+                Task { await catalogService.fetchCatalog() }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Theme.accent)
+        }
+        .background(Theme.background)
     }
 }
 
@@ -66,39 +93,42 @@ struct SharedTrackRow: View {
             if let num = track.surahNumber {
                 Text("\(num)")
                     .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.textTertiary)
                     .frame(width: 30)
             }
             
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(track.displayTitle)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(isPlaying ? Theme.accent : Theme.textPrimary)
                     .lineLimit(1)
                 Text(track.reciter)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.textSecondary)
             }
             
             Spacer()
             
             Text(track.formattedDuration)
                 .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.textTertiary)
             
             if isDownloading {
                 ProgressView()
-                    .frame(width: 24, height: 24)
+                    .tint(Theme.accent)
+                    .frame(width: 28, height: 28)
             } else if isDownloaded {
                 Button(action: onPlay) {
                     Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
                         .font(.title2)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(Theme.accent)
                 }
                 .buttonStyle(.plain)
             } else {
                 Button(action: onDownload) {
                     Image(systemName: "arrow.down.circle")
                         .font(.title2)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(Theme.accent)
                 }
                 .buttonStyle(.plain)
             }

@@ -4,7 +4,6 @@ import MediaPlayer
 import Observation
 import Combine
 
-/// Service for audio playback using AVPlayer
 @Observable
 final class AudioPlayerService {
     private(set) var currentTrack: (any PlayableTrack)?
@@ -15,8 +14,6 @@ final class AudioPlayerService {
     private(set) var isLoading = false
     private(set) var queue: [any PlayableTrack] = []
     private(set) var currentIndex: Int = 0
-    
-    // Store these separately to avoid Sendable issues with PersistentModels
     private(set) var currentTrackId: UUID?
     private(set) var currentArtworkURL: URL?
     
@@ -125,8 +122,6 @@ final class AudioPlayerService {
     var hasNext: Bool { currentIndex < queue.count - 1 }
     var hasPrevious: Bool { currentIndex > 0 || currentTime > 3 }
     
-    // MARK: - Audio Session
-    
     private func setupAudioSession() {
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
@@ -136,33 +131,27 @@ final class AudioPlayerService {
         }
     }
     
-    // MARK: - Remote Command Center (Lock Screen Controls)
-    
     private func setupRemoteCommandCenter() {
         let commandCenter = MPRemoteCommandCenter.shared()
         
-        // Play
         commandCenter.playCommand.isEnabled = true
         commandCenter.playCommand.addTarget { [weak self] _ in
             self?.resume()
             return .success
         }
         
-        // Pause
         commandCenter.pauseCommand.isEnabled = true
         commandCenter.pauseCommand.addTarget { [weak self] _ in
             self?.pause()
             return .success
         }
         
-        // Toggle Play/Pause
         commandCenter.togglePlayPauseCommand.isEnabled = true
         commandCenter.togglePlayPauseCommand.addTarget { [weak self] _ in
             self?.togglePlayPause()
             return .success
         }
         
-        // Next Track
         commandCenter.nextTrackCommand.isEnabled = true
         commandCenter.nextTrackCommand.addTarget { [weak self] _ in
             guard let self = self, self.hasNext else { return .commandFailed }
@@ -170,14 +159,12 @@ final class AudioPlayerService {
             return .success
         }
         
-        // Previous Track
         commandCenter.previousTrackCommand.isEnabled = true
         commandCenter.previousTrackCommand.addTarget { [weak self] _ in
             self?.previous()
             return .success
         }
         
-        // Skip Forward 15 seconds
         commandCenter.skipForwardCommand.isEnabled = true
         commandCenter.skipForwardCommand.preferredIntervals = [15]
         commandCenter.skipForwardCommand.addTarget { [weak self] _ in
@@ -185,7 +172,6 @@ final class AudioPlayerService {
             return .success
         }
         
-        // Skip Backward 15 seconds
         commandCenter.skipBackwardCommand.isEnabled = true
         commandCenter.skipBackwardCommand.preferredIntervals = [15]
         commandCenter.skipBackwardCommand.addTarget { [weak self] _ in
@@ -193,7 +179,6 @@ final class AudioPlayerService {
             return .success
         }
         
-        // Seek (scrubbing)
         commandCenter.changePlaybackPositionCommand.isEnabled = true
         commandCenter.changePlaybackPositionCommand.addTarget { [weak self] event in
             guard let positionEvent = event as? MPChangePlaybackPositionCommandEvent else {
@@ -203,8 +188,6 @@ final class AudioPlayerService {
             return .success
         }
     }
-    
-    // MARK: - Now Playing Info (Lock Screen Display)
     
     private func updateNowPlayingInfo() {
         guard let track = currentTrack else {
@@ -222,13 +205,11 @@ final class AudioPlayerService {
             MPMediaItemPropertyMediaType: MPMediaType.music.rawValue
         ]
         
-        // Add queue info if available
         if queue.count > 1 {
             nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackQueueIndex] = currentIndex
             nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackQueueCount] = queue.count
         }
         
-        // Create artwork
         let artworkImage = createArtworkImage()
         let artwork = MPMediaItemArtwork(boundsSize: CGSize(width: 600, height: 600)) { _ in
             artworkImage
@@ -241,14 +222,11 @@ final class AudioPlayerService {
     private func createArtworkImage() -> UIImage {
         let size = CGSize(width: 600, height: 600)
         
-        // Try to load thumbnail from stored URL
         if let artworkURL = currentArtworkURL,
            let imageData = try? Data(contentsOf: artworkURL),
            let thumbnailImage = UIImage(data: imageData) {
-            // Scale and crop thumbnail to square
             let renderer = UIGraphicsImageRenderer(size: size)
             return renderer.image { context in
-                // Calculate aspect fill rect
                 let imageSize = thumbnailImage.size
                 let scale = max(size.width / imageSize.width, size.height / imageSize.height)
                 let scaledWidth = imageSize.width * scale
@@ -260,27 +238,44 @@ final class AudioPlayerService {
             }
         }
         
-        // Fallback to default artwork
         let renderer = UIGraphicsImageRenderer(size: size)
+        let accentColor = Theme.accentUIColor
+        
         return renderer.image { context in
-            // Background gradient
+            UIColor.black.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            
             let colors = [
-                UIColor.systemTeal.withAlphaComponent(0.3).cgColor,
-                UIColor.systemTeal.withAlphaComponent(0.1).cgColor
+                accentColor.withAlphaComponent(0.35).cgColor,
+                accentColor.withAlphaComponent(0.15).cgColor,
+                accentColor.withAlphaComponent(0.05).cgColor
             ]
             let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
                                        colors: colors as CFArray,
-                                       locations: [0, 1])!
+                                       locations: [0, 0.5, 1])!
             
             context.cgContext.drawLinearGradient(gradient,
                                                   start: CGPoint(x: 0, y: 0),
                                                   end: CGPoint(x: size.width, y: size.height),
                                                   options: [])
             
-            // Waveform icon
+            let circleColor = accentColor.withAlphaComponent(0.15)
+            context.cgContext.setStrokeColor(circleColor.cgColor)
+            context.cgContext.setLineWidth(1)
+            for i in 0..<3 {
+                let circleSize = size.width * (0.4 + CGFloat(i) * 0.2)
+                let circleRect = CGRect(
+                    x: (size.width - circleSize) / 2,
+                    y: (size.height - circleSize) / 2,
+                    width: circleSize,
+                    height: circleSize
+                )
+                context.cgContext.strokeEllipse(in: circleRect)
+            }
+            
             let iconConfig = UIImage.SymbolConfiguration(pointSize: 150, weight: .light)
             if let waveformImage = UIImage(systemName: "waveform", withConfiguration: iconConfig) {
-                let tintedImage = waveformImage.withTintColor(.systemTeal.withAlphaComponent(0.6))
+                let tintedImage = waveformImage.withTintColor(accentColor.withAlphaComponent(0.6))
                 let iconSize = tintedImage.size
                 let iconRect = CGRect(
                     x: (size.width - iconSize.width) / 2,
@@ -293,10 +288,7 @@ final class AudioPlayerService {
         }
     }
     
-    // MARK: - Notification Observers
-    
     private func setupNotificationObservers() {
-        // Listen for audio interruptions (phone calls, etc.)
         NotificationCenter.default.addObserver(
             forName: AVAudioSession.interruptionNotification,
             object: nil,
@@ -327,8 +319,6 @@ final class AudioPlayerService {
             break
         }
     }
-    
-    // MARK: - Playback
     
     private func playCurrentTrack() {
         guard currentIndex < queue.count else { return }
@@ -375,7 +365,6 @@ final class AudioPlayerService {
             }
             .store(in: &cancellables)
         
-        // Track end notification
         NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: playerItem,
@@ -387,7 +376,6 @@ final class AudioPlayerService {
         let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
         timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             self?.currentTime = time.seconds
-            // Update now playing info periodically for accurate progress
             if Int(time.seconds) % 5 == 0 {
                 self?.updateNowPlayingInfo()
             }
@@ -410,8 +398,6 @@ final class AudioPlayerService {
     }
 }
 
-// MARK: - PlayableTrack Protocol
-
 protocol PlayableTrack {
     var id: UUID { get }
     var title: String { get }
@@ -424,7 +410,7 @@ protocol PlayableTrack {
 extension SharedTrack: PlayableTrack {
     var artist: String? { reciter }
     var trackDuration: Int { durationSeconds ?? 0 }
-    var artworkURL: URL? { nil } // Quran tracks don't have artwork yet
+    var artworkURL: URL? { nil }
     
     func getPlaybackURL() -> URL? {
         let localPath = AppConfig.quranDirectoryURL

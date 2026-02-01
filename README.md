@@ -1,6 +1,6 @@
 # Iqra - Personal Audio Library
 
-A personal Quran audio library iOS app with YouTube import support. No database needed - just R2 storage and a JSON catalog.
+A personal Quran audio library iOS app with YouTube import support.
 
 ## Architecture
 
@@ -11,7 +11,7 @@ A personal Quran audio library iOS app with YouTube import support. No database 
 │  Library View  │  Quran View  │  Imports View  │  Player View       │
 ├─────────────────────────────────────────────────────────────────────┤
 │  CatalogService  │  DownloadManager  │  ConversionService           │
-│  AudioPlayerService  │  NowPlayingService  │  LocalLibraryService   │
+│  AudioPlayerService  │  LocalLibraryService                         │
 └───────────────────────────┬─────────────────────────────────────────┘
                             │
                 ┌───────────┴───────────┐
@@ -20,18 +20,8 @@ A personal Quran audio library iOS app with YouTube import support. No database 
         │ Cloudflare R2 │       │    Fly.io     │
         │  Audio Files  │       │  YT Convert   │
         │  + catalog    │       │    Server     │
-        │    FREE       │       │    FREE       │
         └───────────────┘       └───────────────┘
 ```
-
-## Cost
-
-| Service | Monthly Cost |
-|---------|--------------|
-| Cloudflare R2 | $0 (10GB free, no egress fees) |
-| Fly.io | $0 (free tier) |
-| **Cloud Total** | **$0/month** |
-| Apple Developer | $99/year |
 
 ## Project Structure
 
@@ -48,7 +38,8 @@ iqra/
 │   ├── main.py
 │   ├── Dockerfile
 │   ├── fly.toml
-│   └── requirements.txt
+│   ├── requirements.txt
+│   └── problems_and_fixes/
 └── Iqra/
     └── Iqra/
         ├── IqraApp.swift
@@ -57,48 +48,6 @@ iqra/
         ├── Services/
         └── Views/
 ```
-
-## Quick Start
-
-### 1. Set Up R2 Storage
-
-Follow [setup/01-cloudflare-r2-setup.md](setup/01-cloudflare-r2-setup.md):
-- Create Cloudflare account
-- Create R2 bucket
-- Upload your Quran MP3 files
-
-### 2. Generate & Upload Catalog
-
-```bash
-cd setup/scripts
-
-# Generate catalog from your local files
-python generate_catalog.py /path/to/quran catalog.json
-
-# Upload to R2
-wrangler r2 object put iqra-audio/catalog.json --file catalog.json
-```
-
-### 3. Deploy Conversion Server (for YouTube imports)
-
-```bash
-cd conversion-server
-
-fly auth login
-fly launch
-fly deploy
-```
-
-### 4. Build iOS App
-
-1. Open `Iqra/` in Xcode
-2. Update `Config/CloudConfig.swift` with your R2 URL
-3. Enable Background Audio capability
-4. Build and run!
-
-### 5. Distribute via TestFlight
-
-Follow [setup/03-testflight-setup.md](setup/03-testflight-setup.md)
 
 ## How It Works
 
@@ -118,14 +67,34 @@ User taps track → Download from R2 → Save locally → Play
 User pastes URL → Fly.io converts → Streams MP3 → Saves to device
 ```
 
+## Conversion Server
+
+Job-based polling to avoid gateway timeouts on long videos:
+
+```
+iOS App                              Fly.io Server
+   │                                      │
+   │──POST /jobs?url=...────────────────▶│
+   │◀─────────{job_id: "abc123"}─────────│  (immediate)
+   │                                      │
+   │──GET /jobs/abc123──────────────────▶│  [converting...]
+   │◀─────────{status: "processing"}─────│
+   │                                      │
+   │──GET /jobs/abc123──────────────────▶│  [done]
+   │◀─────────{status: "completed"}──────│
+   │                                      │
+   │──GET /jobs/abc123/download─────────▶│
+   │◀─────────[MP3 stream]───────────────│
+```
+
 ## Features
 
-- 🎵 Browse Quran by surah and reciter
-- 📥 Download tracks for offline playback
-- 🔗 Import audio from YouTube
-- 🔒 Lock screen controls
-- ⏩ Playback speed (0.5x - 2x)
-- 🔍 Search tracks
+- Browse Quran by surah and reciter
+- Download tracks for offline playback
+- Import audio from YouTube
+- Lock screen controls
+- Playback speed control
+- Search tracks
 
 ## Adding More Tracks
 

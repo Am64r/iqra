@@ -1,0 +1,22 @@
+JOB-BASED POLLING ARCHITECTURE
+==============================
+
+Problem: Long YouTube videos fail with "504 Gateway Timeout" errors because
+Fly.io's HTTP proxy terminates connections after ~60 seconds.
+
+Old approach: Single request waits for entire conversion before responding.
+A 5-minute video takes 2-3 minutes to convert, exceeding the timeout.
+
+New approach: Job-based polling with three endpoints:
+
+  POST /jobs?url=...     → Returns job_id immediately
+  GET  /jobs/{job_id}    → Poll status: pending/processing/completed/failed  
+  GET  /jobs/{job_id}/download → Download MP3 when complete
+
+Each request completes in <1 second. No timeout risk.
+
+iOS client changes:
+1. POST to /jobs to start conversion
+2. Poll /jobs/{id} every 2 seconds until done
+3. Download from /jobs/{id}/download
+4. Show elapsed time during polling

@@ -1,12 +1,5 @@
-"""
-Iqra YouTube Conversion Server
-
-A FastAPI server that extracts audio from YouTube videos and streams MP3 directly to clients.
-Designed to run on Fly.io free tier with auto-sleep.
-"""
-
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
+from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import yt_dlp
 import tempfile
@@ -17,18 +10,36 @@ import logging
 import base64
 import shutil
 import traceback
+import asyncio
+import json
+import uuid
+from datetime import datetime, timedelta
+from typing import Optional
+from enum import Enum
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Constants
 COOKIES_FILE = "/tmp/youtube_cookies.txt"
+JOBS_DIR = "/tmp/iqra_jobs"
 CHUNK_SIZE = 8192
 MAX_FILENAME_LENGTH = 200
+JOB_EXPIRY_MINUTES = 30
+
+os.makedirs(JOBS_DIR, exist_ok=True)
+
+
+class JobStatus(str, Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+jobs: dict = {}
+
 
 def setup_cookies():
-    """Set up cookies file from environment variable if available."""
     cookies_b64 = os.environ.get("YOUTUBE_COOKIES_B64")
     if cookies_b64:
         try:
@@ -41,12 +52,11 @@ def setup_cookies():
             logger.warning(f"Failed to load cookies: {e}")
     return False
 
-# Try to load cookies on startup
+
 COOKIES_AVAILABLE = setup_cookies()
 
-# Common yt-dlp options for YouTube extraction (used by metadata/debug endpoints)
+
 def get_base_ydl_opts():
-    """Get base yt-dlp options with cookies."""
     opts = {
         'quiet': True,
         'no_warnings': True,
@@ -55,13 +65,13 @@ def get_base_ydl_opts():
         opts['cookiefile'] = COOKIES_FILE
     return opts
 
+
 app = FastAPI(
     title="Iqra Conversion Server",
     description="YouTube to MP3 conversion API",
-    version="1.0.0"
+    version="2.0.0"
 )
 
-# Allow CORS for iOS app
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -70,7 +80,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Regex patterns for YouTube URL validation
 YOUTUBE_PATTERNS = [
     r'(https?://)?(www\.)?youtube\.com/watch\?v=[\w-]+',
     r'(https?://)?(www\.)?youtu\.be/[\w-]+',
@@ -80,7 +89,6 @@ YOUTUBE_PATTERNS = [
 
 
 def is_valid_youtube_url(url: str) -> bool:
-    """Validate that the URL is a YouTube URL."""
     for pattern in YOUTUBE_PATTERNS:
         if re.match(pattern, url):
             return True
@@ -88,82 +96,61 @@ def is_valid_youtube_url(url: str) -> bool:
 
 
 def sanitize_filename(filename: str) -> str:
-    """Remove unsafe characters from filename."""
     unsafe_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|']
     for char in unsafe_chars:
         filename = filename.replace(char, '_')
     return filename[:MAX_FILENAME_LENGTH]
 
 
+def cleanup_old_jobs():
+    now = datetime.now()
+    expired = []
+    for job_id, job in jobs.items():
+        if now - job['created_at'] > timedelta(minutes=JOB_EXPIRY_MINUTES):
+            expired.append(job_id)
+    
+    for job_id in expired:
+        job = jobs.pop(job_id, None)
+        if job and job.get('output_dir'):
+            shutil.rmtree(job['output_dir'], ignore_errors=True)
+        logger.info(f"Cleaned up expired job: {job_id}")
+
+
 @app.get("/")
 async def root():
-    """Root endpoint with API info."""
     return {
         "name": "Iqra Conversion Server",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "endpoints": {
             "/health": "Health check",
-            "/metadata": "Get video metadata without downloading",
-            "/convert": "Convert YouTube video to MP3 and stream"
+            "/metadata": "Get video metadata",
+            "POST /jobs": "Start conversion job",
+            "GET /jobs/{job_id}": "Poll job status",
+            "GET /jobs/{job_id}/download": "Download completed file"
         }
     }
 
 
 @app.get("/health")
 async def health():
-    """Health check endpoint for Fly.io."""
     deno_path = shutil.which("deno")
-    
-    # Check cookies file
     cookies_exist = os.path.exists(COOKIES_FILE)
     cookies_size = os.path.getsize(COOKIES_FILE) if cookies_exist else 0
     
     return {
         "status": "ok",
-        "version": "7",  # Increment to verify deployment
+        "version": "8",
         "cookies_loaded": COOKIES_AVAILABLE,
         "cookies_file_exists": cookies_exist,
         "cookies_file_size": cookies_size,
         "deno_available": deno_path is not None,
-        "deno_path": deno_path
+        "deno_path": deno_path,
+        "active_jobs": len([j for j in jobs.values() if j['status'] in [JobStatus.PENDING, JobStatus.PROCESSING]])
     }
-
-
-@app.get("/debug-formats")
-async def debug_formats(url: str = Query(..., description="YouTube URL")):
-    """Debug endpoint to list available formats."""
-    if not is_valid_youtube_url(url):
-        raise HTTPException(status_code=400, detail="Invalid YouTube URL")
-    
-    try:
-        ydl_opts = get_base_ydl_opts()
-        
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            formats = info.get('formats', [])
-            
-            return {
-                "title": info.get('title'),
-                "total_formats": len(formats),
-                "format_ids": [f.get('format_id') for f in formats[:30]],
-            }
-    except Exception as e:
-        return {
-            "error": str(e),
-            "error_type": type(e).__name__,
-            "traceback": traceback.format_exc()[-1000:]
-        }
 
 
 @app.get("/metadata")
 async def get_metadata(url: str = Query(..., description="YouTube URL")):
-    """
-    Get video metadata without downloading.
-    Uses async subprocess for non-blocking operation.
-    """
-    import asyncio
-    import json
-    
     if not is_valid_youtube_url(url):
         raise HTTPException(
             status_code=400, 
@@ -219,48 +206,34 @@ async def get_metadata(url: str = Query(..., description="YouTube URL")):
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
 
-@app.get("/convert")
-async def convert(
-    url: str = Query(..., description="YouTube URL"),
-    quality: str = Query("192", description="Audio quality (128, 192, 256, 320)")
-):
-    """
-    Convert YouTube video to MP3 and stream directly to client.
-    Uses async subprocess for non-blocking operation.
-    """
-    import asyncio
-    import json
+async def run_conversion(job_id: str, url: str, quality: str):
+    job = jobs.get(job_id)
+    if not job:
+        return
     
-    if not is_valid_youtube_url(url):
-        raise HTTPException(status_code=400, detail="Invalid YouTube URL")
+    job['status'] = JobStatus.PROCESSING
+    job['progress'] = "Starting conversion..."
     
-    # Validate quality
-    valid_qualities = ['128', '192', '256', '320']
-    if quality not in valid_qualities:
-        quality = '192'
-    
-    logger.info(f"Converting: {url} at {quality}kbps")
-    
-    tmpdir = tempfile.mkdtemp()
+    tmpdir = tempfile.mkdtemp(dir=JOBS_DIR)
+    job['output_dir'] = tmpdir
     output_path = os.path.join(tmpdir, "audio.mp3")
     
     try:
-        # Build yt-dlp command with flags we KNOW work
         cmd = [
             'yt-dlp',
-            '--remote-components', 'ejs:github',  # The key flag!
+            '--remote-components', 'ejs:github',
             '--cookies', COOKIES_FILE,
-            '-x',  # Extract audio
+            '-x',
             '--audio-format', 'mp3',
             '--audio-quality', quality + 'K',
             '-o', output_path,
-            '--print-json',  # Get metadata as JSON
+            '--print-json',
+            '--newline',  # Progress on new lines
             url
         ]
         
-        logger.info(f"Running: {' '.join(cmd)}")
+        job['progress'] = "Downloading and converting..."
         
-        # Use async subprocess so server stays responsive
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
@@ -270,75 +243,160 @@ async def convert(
         try:
             stdout, stderr = await asyncio.wait_for(
                 process.communicate(),
-                timeout=300  # 5 min timeout
+                timeout=1800  # 30 min timeout for very long videos
             )
         except asyncio.TimeoutError:
             process.kill()
-            raise HTTPException(status_code=504, detail="Conversion timed out")
+            job['status'] = JobStatus.FAILED
+            job['error'] = "Conversion timed out (30 min limit)"
+            return
         
         if process.returncode != 0:
-            logger.error(f"yt-dlp failed: {stderr.decode()}")
-            raise HTTPException(
-                status_code=400,
-                detail=f"Could not download video: {stderr.decode()[:500]}"
-            )
+            logger.error(f"Job {job_id} failed: {stderr.decode()}")
+            job['status'] = JobStatus.FAILED
+            job['error'] = f"Conversion failed: {stderr.decode()[:200]}"
+            return
         
         stdout_text = stdout.decode()
-        
-        # Parse metadata from JSON output
         try:
             info = json.loads(stdout_text.strip().split('\n')[-1])
-            title = info.get('title', 'Unknown')
-            artist = info.get('uploader') or info.get('channel') or 'Unknown'
-            duration = info.get('duration', 0)
+            job['title'] = info.get('title', 'Unknown')
+            job['artist'] = info.get('uploader') or info.get('channel') or 'Unknown'
+            job['duration'] = info.get('duration', 0)
         except (json.JSONDecodeError, IndexError):
-            title = 'Unknown'
-            artist = 'Unknown'
-            duration = 0
+            job['title'] = 'Unknown'
+            job['artist'] = 'Unknown'
+            job['duration'] = 0
         
         if not os.path.exists(output_path):
-            # Try to find any mp3 file
             for f in os.listdir(tmpdir):
                 if f.endswith('.mp3'):
                     output_path = os.path.join(tmpdir, f)
                     break
             else:
-                raise HTTPException(status_code=500, detail="Conversion failed - no output file")
+                job['status'] = JobStatus.FAILED
+                job['error'] = "No output file produced"
+                return
         
-        file_size = os.path.getsize(output_path)
-        logger.info(f"Conversion complete: {title} ({file_size} bytes)")
+        job['output_path'] = output_path
+        job['file_size'] = os.path.getsize(output_path)
+        job['status'] = JobStatus.COMPLETED
+        job['progress'] = "Complete"
+        logger.info(f"Job {job_id} completed: {job['title']} ({job['file_size']} bytes)")
         
-        def iter_file():
-            try:
-                with open(output_path, 'rb') as f:
-                    while chunk := f.read(CHUNK_SIZE):
-                        yield chunk
-            finally:
-                shutil.rmtree(tmpdir, ignore_errors=True)
-        
-        safe_title = urllib.parse.quote(sanitize_filename(title), safe='')
-        safe_artist = urllib.parse.quote(sanitize_filename(artist), safe='')
-        
-        return StreamingResponse(
-            iter_file(),
-            media_type="audio/mpeg",
-            headers={
-                "Content-Length": str(file_size),
-                "X-Track-Title": safe_title,
-                "X-Track-Artist": safe_artist,
-                "X-Track-Duration": str(duration),
-                "Content-Disposition": f'attachment; filename="{safe_title}.mp3"',
-                "Cache-Control": "no-cache",
-            }
-        )
-        
-    except HTTPException:
-        shutil.rmtree(tmpdir, ignore_errors=True)
-        raise
     except Exception as e:
-        shutil.rmtree(tmpdir, ignore_errors=True)
-        logger.error(f"Conversion error: {e}")
-        raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
+        logger.error(f"Job {job_id} error: {e}")
+        job['status'] = JobStatus.FAILED
+        job['error'] = str(e)
+
+
+@app.post("/jobs")
+async def create_job(
+    background_tasks: BackgroundTasks,
+    url: str = Query(..., description="YouTube URL"),
+    quality: str = Query("128", description="Audio quality (128, 192, 256, 320)")
+):
+    if not is_valid_youtube_url(url):
+        raise HTTPException(status_code=400, detail="Invalid YouTube URL")
+    
+    valid_qualities = ['128', '192', '256', '320']
+    if quality not in valid_qualities:
+        quality = '128'
+    
+    cleanup_old_jobs()
+    
+    job_id = str(uuid.uuid4())
+    jobs[job_id] = {
+        'id': job_id,
+        'url': url,
+        'quality': quality,
+        'status': JobStatus.PENDING,
+        'progress': 'Queued',
+        'created_at': datetime.now(),
+        'title': None,
+        'artist': None,
+        'duration': None,
+        'output_path': None,
+        'output_dir': None,
+        'file_size': None,
+        'error': None,
+    }
+    
+    background_tasks.add_task(run_conversion, job_id, url, quality)
+    
+    return {
+        "job_id": job_id,
+        "status": JobStatus.PENDING,
+        "message": "Conversion started"
+    }
+
+
+@app.get("/jobs/{job_id}")
+async def get_job_status(job_id: str):
+    job = jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    response = {
+        "job_id": job_id,
+        "status": job['status'],
+        "progress": job['progress'],
+    }
+    
+    if job['status'] == JobStatus.COMPLETED:
+        response.update({
+            "title": job['title'],
+            "artist": job['artist'],
+            "duration": job['duration'],
+            "file_size": job['file_size'],
+        })
+    elif job['status'] == JobStatus.FAILED:
+        response['error'] = job['error']
+    
+    return response
+
+
+@app.get("/jobs/{job_id}/download")
+async def download_job(job_id: str):
+    job = jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    if job['status'] != JobStatus.COMPLETED:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Job not ready for download. Status: {job['status']}"
+        )
+    
+    output_path = job.get('output_path')
+    if not output_path or not os.path.exists(output_path):
+        raise HTTPException(status_code=404, detail="Output file not found")
+    
+    safe_title = urllib.parse.quote(sanitize_filename(job['title']), safe='')
+    safe_artist = urllib.parse.quote(sanitize_filename(job['artist']), safe='')
+    
+    def iter_file():
+        try:
+            with open(output_path, 'rb') as f:
+                while chunk := f.read(CHUNK_SIZE):
+                    yield chunk
+        finally:
+            if job.get('output_dir'):
+                shutil.rmtree(job['output_dir'], ignore_errors=True)
+            jobs.pop(job_id, None)
+    
+    return StreamingResponse(
+        iter_file(),
+        media_type="audio/mpeg",
+        headers={
+            "Content-Length": str(job['file_size']),
+            "X-Track-Title": safe_title,
+            "X-Track-Artist": safe_artist,
+            "X-Track-Duration": str(job['duration']),
+            "Content-Disposition": f'attachment; filename="{safe_title}.mp3"',
+            "Cache-Control": "no-cache",
+        }
+    )
 
 
 if __name__ == "__main__":

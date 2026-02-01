@@ -22,12 +22,12 @@ struct TrackRow: View {
                             placeholderView
                         }
                     }
-                    .frame(width: 44, height: 44)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .frame(width: 48, height: 48)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay {
                         if isPlaying {
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(.black.opacity(0.4))
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(.black.opacity(0.5))
                             PlayingIndicator()
                         }
                     }
@@ -35,15 +35,16 @@ struct TrackRow: View {
                     placeholderView
                 }
             }
-            .frame(width: 44, height: 44)
+            .frame(width: 48, height: 48)
             
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
+                    .font(.body.weight(.medium))
                     .lineLimit(1)
-                    .foregroundStyle(isPlaying ? Color.accentColor : .primary)
+                    .foregroundStyle(isPlaying ? Theme.accent : Theme.textPrimary)
                 Text(subtitle)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.textSecondary)
                     .lineLimit(1)
             }
             
@@ -51,11 +52,11 @@ struct TrackRow: View {
             
             Text(duration)
                 .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.textTertiary)
             
             Image(systemName: isPlaying ? "speaker.wave.2.fill" : "play.fill")
                 .font(.caption)
-                .foregroundStyle(isPlaying ? Color.accentColor : .secondary)
+                .foregroundStyle(isPlaying ? Theme.accent : Theme.textTertiary)
         }
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
@@ -64,15 +65,21 @@ struct TrackRow: View {
     @ViewBuilder
     private var placeholderView: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.accentColor.opacity(0.1))
+            RoundedRectangle(cornerRadius: 8)
+                .fill(
+                    LinearGradient(
+                        colors: [Theme.accentSubtle, Theme.accent.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
             
             if isPlaying {
                 PlayingIndicator()
             } else {
                 Image(systemName: "waveform")
                     .font(.caption)
-                    .foregroundStyle(Color.accentColor.opacity(0.5))
+                    .foregroundStyle(Theme.accentMuted)
             }
         }
     }
@@ -85,9 +92,14 @@ struct PlayingIndicator: View {
         HStack(spacing: 2) {
             ForEach(0..<3, id: \.self) { i in
                 RoundedRectangle(cornerRadius: 1)
-                    .fill(Color.accentColor)
+                    .fill(Theme.accent)
                     .frame(width: 3, height: animating ? CGFloat.random(in: 8...16) : 8)
-                    .animation(.easeInOut(duration: 0.4).repeatForever().delay(Double(i) * 0.1), value: animating)
+                    .animation(
+                        .easeInOut(duration: 0.4)
+                        .repeatForever()
+                        .delay(Double(i) * 0.1),
+                        value: animating
+                    )
             }
         }
         .onAppear { animating = true }

@@ -20,11 +20,7 @@ struct LibraryView: View {
         NavigationStack {
             Group {
                 if localTracks.isEmpty {
-                    ContentUnavailableView {
-                        Label("No Downloads", systemImage: "arrow.down.circle")
-                    } description: {
-                        Text("Download tracks from the Quran tab or import from YouTube")
-                    }
+                    emptyStateView
                 } else {
                     List {
                         ForEach(filteredTracks) { track in
@@ -37,6 +33,7 @@ struct LibraryView: View {
                             ) {
                                 playerService.play(track)
                             }
+                            .listRowBackground(Color.clear)
                             .swipeActions(edge: .trailing) {
                                 Button(role: .destructive) {
                                     deleteTrack(track)
@@ -47,11 +44,26 @@ struct LibraryView: View {
                         }
                     }
                     .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .background(Theme.background)
                 }
             }
+            .background(Theme.background)
             .navigationTitle("Library")
             .searchable(text: $searchText, prompt: "Search tracks")
+            .toolbarBackground(Theme.background, for: .navigationBar)
         }
+    }
+    
+    private var emptyStateView: some View {
+        ContentUnavailableView {
+            Label("No Downloads", systemImage: "arrow.down.circle")
+                .foregroundStyle(Theme.accent)
+        } description: {
+            Text("Download tracks from the Quran tab or import from YouTube")
+                .foregroundStyle(Theme.textSecondary)
+        }
+        .background(Theme.background)
     }
     
     private func deleteTrack(_ track: LocalTrack) {

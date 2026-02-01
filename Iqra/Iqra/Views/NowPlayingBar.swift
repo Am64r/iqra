@@ -6,57 +6,42 @@ struct NowPlayingBar: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Progress indicator at top
             GeometryReader { geo in
-                Rectangle()
-                    .fill(Color.accentColor)
-                    .frame(width: geo.size.width * playerService.progress)
+                Capsule()
+                    .fill(Theme.accent)
+                    .frame(width: geo.size.width * playerService.progress, height: 3)
+                    .shadow(color: Theme.accent.opacity(0.5), radius: 4, y: 0)
             }
             .frame(height: 3)
-            .background(Color.primary.opacity(0.08))
+            .background(Theme.textTertiary.opacity(0.2))
+            .clipShape(Capsule())
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
             
-            // Main content
             HStack(spacing: 14) {
-                // Artwork thumbnail
-                Group {
-                    if let artworkURL = playerService.currentArtworkURL,
-                       FileManager.default.fileExists(atPath: artworkURL.path) {
-                        AsyncImage(url: artworkURL) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            default:
-                                artworkPlaceholder
-                            }
-                        }
-                    } else {
-                        artworkPlaceholder
-                    }
-                }
-                .frame(width: 48, height: 48)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                artworkView
+                    .frame(width: 48, height: 48)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                 
-                // Track info
                 VStack(alignment: .leading, spacing: 3) {
                     Text(playerService.currentTrack?.title ?? "Not Playing")
                         .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
                     
                     Text(playerService.currentTrack?.artist ?? "")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.textSecondary)
                         .lineLimit(1)
                 }
                 
                 Spacer()
                 
-                // Controls
                 HStack(spacing: 4) {
                     Button { playerService.togglePlayPause() } label: {
                         Image(systemName: playerService.isPlaying ? "pause.fill" : "play.fill")
                             .font(.title3.weight(.semibold))
+                            .foregroundStyle(Theme.textPrimary)
                             .frame(width: 48, height: 48)
                             .contentShape(Rectangle())
                     }
@@ -64,41 +49,67 @@ struct NowPlayingBar: View {
                     Button { playerService.next() } label: {
                         Image(systemName: "forward.fill")
                             .font(.body.weight(.semibold))
+                            .foregroundStyle(playerService.hasNext ? Theme.textPrimary : Theme.textTertiary)
                             .frame(width: 44, height: 48)
                             .contentShape(Rectangle())
                     }
-                    .opacity(playerService.hasNext ? 1 : 0.35)
                     .disabled(!playerService.hasNext)
                 }
-                .foregroundStyle(.primary)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.1), radius: 10, y: -2)
-        .padding(.horizontal, 8)
-        .padding(.bottom, 4)
+        .background {
+            if #available(iOS 26.0, *) {
+                Capsule()
+                    .glassEffect(.regular.interactive())
+            } else {
+                Capsule()
+                    .fill(.ultraThinMaterial)
+            }
+        }
+        .clipShape(Capsule())
+        .shadow(color: .black.opacity(0.3), radius: 20, y: 5)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
         .contentShape(Rectangle())
         .onTapGesture { showingPlayer = true }
     }
     
     @ViewBuilder
+    private var artworkView: some View {
+        if let artworkURL = playerService.currentArtworkURL,
+           FileManager.default.fileExists(atPath: artworkURL.path) {
+            AsyncImage(url: artworkURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                default:
+                    artworkPlaceholder
+                }
+            }
+        } else {
+            artworkPlaceholder
+        }
+    }
+    
+    @ViewBuilder
     private var artworkPlaceholder: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 10)
                 .fill(
                     LinearGradient(
-                        colors: [Color.accentColor.opacity(0.25), Color.accentColor.opacity(0.1)],
+                        colors: [Theme.accentSubtle, Theme.accent.opacity(0.05)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
             
             Image(systemName: "waveform")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(Color.accentColor.opacity(0.7))
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(Theme.accentMuted)
         }
     }
 }
