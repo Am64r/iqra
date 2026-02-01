@@ -1,0 +1,544 @@
+{
+  "version": 1,
+  "generated_at": "2026-01-18T05:02:31.572901Z",
+  "reciters": [
+    {
+      "slug": "yasser-ad-dossari",
+      "name": "Yasser Ad Dossari"
+    }
+  ],
+  "tracks": [
+    {
+      "title": "Al-Fatihah",
+      "surah_number": 1,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/001-fatihah.mp3",
+      "duration_seconds": 43
+    },
+    {
+      "title": "Al-Baqarah",
+      "surah_number": 2,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/002-baqarah.mp3",
+      "duration_seconds": 6810
+    },
+    {
+      "title": "Ali 'Imran",
+      "surah_number": 3,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/003-ali-imran.mp3",
+      "duration_seconds": 4260
+    },
+    {
+      "title": "An-Nisa",
+      "surah_number": 4,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/004-nisa.mp3",
+      "duration_seconds": 4790
+    },
+    {
+      "title": "Al-Ma'idah",
+      "surah_number": 5,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/005-maidah.mp3",
+      "duration_seconds": 3210
+    },
+    {
+      "title": "Al-An'am",
+      "surah_number": 6,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/006-anam.mp3",
+      "duration_seconds": 3539
+    },
+    {
+      "title": "Al-A'raf",
+      "surah_number": 7,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/007-araf.mp3",
+      "duration_seconds": 4549
+    },
+    {
+      "title": "Al-Anfal",
+      "surah_number": 8,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/008-anfal.mp3",
+      "duration_seconds": 1851
+    },
+    {
+      "title": "At-Tawbah",
+      "surah_number": 9,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/009-tawbah.mp3",
+      "duration_seconds": 3220
+    },
+    {
+      "title": "Yunus",
+      "surah_number": 10,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/010-yunus.mp3",
+      "duration_seconds": 2415
+    },
+    {
+      "title": "Hud",
+      "surah_number": 11,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/011-hud.mp3",
+      "duration_seconds": 2391
+    },
+    {
+      "title": "Yusuf",
+      "surah_number": 12,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/012-yusuf.mp3",
+      "duration_seconds": 2230
+    },
+    {
+      "title": "Ar-Ra'd",
+      "surah_number": 13,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/013-rad.mp3",
+      "duration_seconds": 970
+    },
+    {
+      "title": "Ibrahim",
+      "surah_number": 14,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/014-ibrahim.mp3",
+      "duration_seconds": 1320
+    },
+    {
+      "title": "Al-Hijr",
+      "surah_number": 15,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/015-hijr.mp3",
+      "duration_seconds": 825
+    },
+    {
+      "title": "An-Nahl",
+      "surah_number": 16,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/016-nahl.mp3",
+      "duration_seconds": 2280
+    },
+    {
+      "title": "Al-Isra",
+      "surah_number": 17,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/017-isra-alt.mp3",
+      "duration_seconds": 2189
+    },
+    {
+      "title": "Al-Isra",
+      "surah_number": 17,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/017-isra-excerpt.mp3",
+      "duration_seconds": 219
+    },
+    {
+      "title": "Al-Isra",
+      "surah_number": 17,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/017-isra.mp3",
+      "duration_seconds": 1780
+    },
+    {
+      "title": "Al-Kahf",
+      "surah_number": 18,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/018-kahf-alt.mp3",
+      "duration_seconds": 1971
+    },
+    {
+      "title": "Al-Kahf",
+      "surah_number": 18,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/018-kahf.mp3",
+      "duration_seconds": 1740
+    },
+    {
+      "title": "Maryam",
+      "surah_number": 19,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/019-maryam-alt.mp3",
+      "duration_seconds": 1084
+    },
+    {
+      "title": "Maryam",
+      "surah_number": 19,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/019-maryam.mp3",
+      "duration_seconds": 1410
+    },
+    {
+      "title": "Ta-Ha",
+      "surah_number": 20,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/020-taha.mp3",
+      "duration_seconds": 1535
+    },
+    {
+      "title": "Al-Anbiya",
+      "surah_number": 21,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/021-anbiya.mp3",
+      "duration_seconds": 1349
+    },
+    {
+      "title": "Al-Hajj",
+      "surah_number": 22,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/022-hajj.mp3",
+      "duration_seconds": 1500
+    },
+    {
+      "title": "Al-Mu'minun",
+      "surah_number": 23,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/023-muminun.mp3",
+      "duration_seconds": 1276
+    },
+    {
+      "title": "An-Nur",
+      "surah_number": 24,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/024-nur.mp3",
+      "duration_seconds": 1605
+    },
+    {
+      "title": "Al-Furqan",
+      "surah_number": 25,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/025-furqan.mp3",
+      "duration_seconds": 1020
+    },
+    {
+      "title": "Ash-Shu'ara",
+      "surah_number": 26,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/026-shuara.mp3",
+      "duration_seconds": 1280
+    },
+    {
+      "title": "An-Naml",
+      "surah_number": 27,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/027-naml.mp3",
+      "duration_seconds": 1538
+    },
+    {
+      "title": "Al-Qasas",
+      "surah_number": 28,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/028-qasas-excerpt.mp3",
+      "duration_seconds": 370
+    },
+    {
+      "title": "Al-Qasas",
+      "surah_number": 28,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/028-qasas.mp3",
+      "duration_seconds": 1560
+    },
+    {
+      "title": "Al-Ankabut",
+      "surah_number": 29,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/029-ankabut.mp3",
+      "duration_seconds": 1042
+    },
+    {
+      "title": "Ar-Rum",
+      "surah_number": 30,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/030-rum.mp3",
+      "duration_seconds": 946
+    },
+    {
+      "title": "Luqman",
+      "surah_number": 31,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/031-luqman.mp3",
+      "duration_seconds": 797
+    },
+    {
+      "title": "As-Sajdah",
+      "surah_number": 32,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/032-sajdah.mp3",
+      "duration_seconds": 674
+    },
+    {
+      "title": "Al-Ahzab",
+      "surah_number": 33,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/033-ahzab.mp3",
+      "duration_seconds": 1590
+    },
+    {
+      "title": "Saba",
+      "surah_number": 34,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/034-saba.mp3",
+      "duration_seconds": 1070
+    },
+    {
+      "title": "Fatir",
+      "surah_number": 35,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/035-fatir.mp3",
+      "duration_seconds": 1005
+    },
+    {
+      "title": "Ya-Sin",
+      "surah_number": 36,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/036-yasin.mp3",
+      "duration_seconds": 1030
+    },
+    {
+      "title": "As-Saffat",
+      "surah_number": 37,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/037-saffat.mp3",
+      "duration_seconds": 1075
+    },
+    {
+      "title": "Sad",
+      "surah_number": 38,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/038-sad.mp3",
+      "duration_seconds": 892
+    },
+    {
+      "title": "Az-Zumar",
+      "surah_number": 39,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/039-zumar.mp3",
+      "duration_seconds": 1836
+    },
+    {
+      "title": "Ghafir",
+      "surah_number": 40,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/040-ghafir.mp3",
+      "duration_seconds": 1313
+    },
+    {
+      "title": "Fussilat",
+      "surah_number": 41,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/041-fussilat.mp3",
+      "duration_seconds": 1008
+    },
+    {
+      "title": "Ash-Shura",
+      "surah_number": 42,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/042-shura.mp3",
+      "duration_seconds": 945
+    },
+    {
+      "title": "Az-Zukhruf",
+      "surah_number": 43,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/043-zukhruf.mp3",
+      "duration_seconds": 941
+    },
+    {
+      "title": "Ad-Dukhan",
+      "surah_number": 44,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/044-dukhan.mp3",
+      "duration_seconds": 390
+    },
+    {
+      "title": "Al-Jathiyah",
+      "surah_number": 45,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/045-jathiyah.mp3",
+      "duration_seconds": 482
+    },
+    {
+      "title": "Al-Ahqaf",
+      "surah_number": 46,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/046-ahqaf.mp3",
+      "duration_seconds": 640
+    },
+    {
+      "title": "Muhammad",
+      "surah_number": 47,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/047-muhammad.mp3",
+      "duration_seconds": 745
+    },
+    {
+      "title": "Al-Fath",
+      "surah_number": 48,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/048-fath.mp3",
+      "duration_seconds": 559
+    },
+    {
+      "title": "Al-Hujurat",
+      "surah_number": 49,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/049-hujurat.mp3",
+      "duration_seconds": 479
+    },
+    {
+      "title": "Qaf",
+      "surah_number": 50,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/050-qaf.mp3",
+      "duration_seconds": 680
+    },
+    {
+      "title": "Adh-Dhariyat",
+      "surah_number": 51,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/051-dhariyat.mp3",
+      "duration_seconds": 340
+    },
+    {
+      "title": "At-Tur",
+      "surah_number": 52,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/052-tur.mp3",
+      "duration_seconds": 340
+    },
+    {
+      "title": "An-Najm",
+      "surah_number": 53,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/053-najm.mp3",
+      "duration_seconds": 390
+    },
+    {
+      "title": "Al-Qamar",
+      "surah_number": 54,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/054-qamar.mp3",
+      "duration_seconds": 320
+    },
+    {
+      "title": "Ar-Rahman",
+      "surah_number": 55,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/055-rahman.mp3",
+      "duration_seconds": 690
+    },
+    {
+      "title": "Al-Waqi'ah",
+      "surah_number": 56,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/056-waqiah.mp3",
+      "duration_seconds": 554
+    },
+    {
+      "title": "Al-Hadid",
+      "surah_number": 57,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/057-hadid.mp3",
+      "duration_seconds": 630
+    },
+    {
+      "title": "Al-Mujadilah",
+      "surah_number": 58,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/058-mujadilah.mp3",
+      "duration_seconds": 490
+    },
+    {
+      "title": "Al-Hashr",
+      "surah_number": 59,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/059-hashr.mp3",
+      "duration_seconds": 570
+    },
+    {
+      "title": "Al-Mumtahanah",
+      "surah_number": 60,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/060-mumtahanah.mp3",
+      "duration_seconds": 410
+    },
+    {
+      "title": "As-Saff",
+      "surah_number": 61,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/061-saff.mp3",
+      "duration_seconds": 245
+    },
+    {
+      "title": "Al-Jumu'ah",
+      "surah_number": 62,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/062-jumuah.mp3",
+      "duration_seconds": 180
+    },
+    {
+      "title": "Al-Munafiqun",
+      "surah_number": 63,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/063-munafiqun.mp3",
+      "duration_seconds": 225
+    },
+    {
+      "title": "At-Taghabun",
+      "surah_number": 64,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/064-taghabun.mp3",
+      "duration_seconds": 294
+    },
+    {
+      "title": "At-Talaq",
+      "surah_number": 65,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/065-talaq.mp3",
+      "duration_seconds": 289
+    },
+    {
+      "title": "At-Tahrim",
+      "surah_number": 66,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/066-tahrim.mp3",
+      "duration_seconds": 340
+    },
+    {
+      "title": "Al-Mulk",
+      "surah_number": 67,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/067-mulk.mp3",
+      "duration_seconds": 555
+    },
+    {
+      "title": "Al-Qalam",
+      "surah_number": 68,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/068-qalam.mp3",
+      "duration_seconds": 256
+    },
+    {
+      "title": "Al-Haqqah",
+      "surah_number": 69,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/069-haqqah.mp3",
+      "duration_seconds": 453
+    },
+    {
+      "title": "Al-Insan",
+      "surah_number": 76,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/076-insan.mp3",
+      "duration_seconds": 295
+    },
+    {
+      "title": "Al-Fajr",
+      "surah_number": 89,
+      "reciter": "yasser-ad-dossari",
+      "r2_path": "quran/yasser-ad-dossari/089-fajr.mp3",
+      "duration_seconds": 300
+    }
+  ]
+}

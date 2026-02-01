@@ -1,0 +1,112 @@
+YOUTUBE YT-DLP FORMAT EXTRACTION FIX
+====================================
+Date: January 2026
+yt-dlp version: 2026.01.29
+
+
+TL;DR
+-----
+yt-dlp on cloud servers fails because: (1) YouTube blocks datacenter IPs as bots - 
+fix by injecting cookies from a logged-in browser session, and (2) YouTube requires 
+JavaScript challenges to be solved to get video/audio formats, but the solver script 
+doesn't download by default - fix by adding --remote-components ejs:github flag. The 
+Python API doesn't pass this flag correctly, so use subprocess to call the CLI directly.
+
+
+THE PROBLEM
+-----------
+yt-dlp fails to extract video/audio formats from YouTube on cloud servers (Fly.io, 
+AWS, etc.) with the error:
+
+  "Requested format is not available. Use --list-formats for a list of available formats"
+
+When running --list-formats, only storyboard images (sb0, sb1, sb2, sb3) are returned
+instead of actual video/audio formats.
+
+
+ROOT CAUSE
+----------
+YouTube requires solving JavaScript "n parameter" challenges to decrypt format URLs.
+Without solving these challenges, YouTube only returns thumbnail/storyboard formats.
+
+yt-dlp uses a JavaScript runtime (deno/node) to solve these challenges, but the 
+challenge solver SCRIPT must be downloaded from GitHub. By default, yt-dlp runs with
+--cached-only and --no-remote flags, preventing this download.
+
+The verbose output shows:
+  [jsc:deno] Running deno: ... --cached-only --no-remote ...
+  WARNING: Remote components challenge solver script (deno) were skipped.
+  WARNING: n challenge solving failed: Some formats may be missing.
+
+
+THE FIX
+-------
+Pass the --remote-components flag to allow downloading the solver script:
+
+  yt-dlp --remote-components ejs:github <URL>
+
+This downloads the challenge solver from:
+  https://github.com/yt-dlp/ejs/releases/download/0.4.0/yt.solver.lib.min.js
+
+
+IMPORTANT: PYTHON API vs CLI
+----------------------------
+The Python API option 'enable_remote_components' does NOT work the same as the CLI 
+flag --remote-components. The CLI flag reliably triggers the download, while the 
+Python option appears to be ignored or improperly passed.
+
+Solution: Use subprocess to call yt-dlp CLI directly instead of the Python API when
+the --remote-components flag is needed.
+
+
+COOKIE AUTHENTICATION (BOT DETECTION BYPASS)
+---------------------------------------------
+YouTube aggressively blocks requests from datacenter IPs (AWS, Fly.io, Hetzner, etc.)
+with the error:
+
+  "Sign in to confirm you're not a bot"
+
+This happens because cloud provider IP ranges are known and flagged. To bypass this,
+inject cookies from a logged-in YouTube session:
+
+1. Export cookies from browser using extension (e.g., "Get cookies.txt LOCALLY")
+2. Export while logged into YouTube - the auth cookies prove you're a real user
+3. Base64 encode for storage: base64 -i cookies.txt > cookies_b64.txt
+4. Store as environment variable (Fly.io secret, etc.)
+5. At runtime, decode and write to temp file: /tmp/youtube_cookies.txt
+6. Pass to yt-dlp: --cookies /tmp/youtube_cookies.txt
+
+Key cookies that matter:
+  - SID, HSID, SSID (Google auth)
+  - LOGIN_INFO (YouTube login state)
+  - Various __Secure-* prefixed cookies
+
+Cookie lifespan: Several months to 1-2 years. If bot detection errors return,
+re-export fresh cookies from your browser.
+
+
+ADDITIONAL REQUIREMENTS
+-----------------------
+1. JavaScript runtime: deno or node must be installed
+2. Cookies: YouTube account cookies (see above)
+3. Network access: Server must be able to reach github.com to download solver
+
+
+DIAGNOSIS STEPS
+---------------
+1. SSH into server
+2. Run: yt-dlp -v --list-formats <URL>
+3. Look for "Remote components... were skipped" warning
+4. If present, add --remote-components ejs:github
+5. Verify audio/video formats now appear in list
+
+
+WORKING COMMAND
+---------------
+yt-dlp --remote-components ejs:github --cookies /path/to/cookies.txt -x --audio-format mp3 <URL>
+
+
+REFERENCES
+----------
+- https://github.com/yt-dlp/yt-dlp/wiki/EJS
+- https://github.com/yt-dlp/ejs
