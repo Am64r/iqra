@@ -8,6 +8,7 @@ import urllib.parse
 import re
 import logging
 import base64
+import contextlib
 import shutil
 import traceback
 import asyncio
@@ -25,6 +26,11 @@ JOBS_DIR = "/tmp/iqra_jobs"
 CHUNK_SIZE = 8192
 MAX_FILENAME_LENGTH = 200
 JOB_EXPIRY_MINUTES = 30
+METADATA_TIMEOUT_SECONDS = int(os.environ.get("METADATA_TIMEOUT_SECONDS", "90"))
+CONVERSION_TIMEOUT_SECONDS = int(os.environ.get("CONVERSION_TIMEOUT_SECONDS", "1800"))
+MAX_METADATA_CONCURRENCY = int(os.environ.get("MAX_METADATA_CONCURRENCY", "2"))
+MAX_CONVERSION_CONCURRENCY = int(os.environ.get("MAX_CONVERSION_CONCURRENCY", "1"))
+CLEANUP_INTERVAL_SECONDS = int(os.environ.get("CLEANUP_INTERVAL_SECONDS", "300"))
 
 os.makedirs(JOBS_DIR, exist_ok=True)
 
@@ -37,6 +43,7 @@ class JobStatus(str, Enum):
 
 
 jobs: dict = {}
+cleanup_task: Optional[asyncio.Task] = None
 
 
 def setup_cookies():
@@ -54,6 +61,44 @@ def setup_cookies():
 
 
 COOKIES_AVAILABLE = setup_cookies()
+metadata_semaphore = asyncio.Semaphore(MAX_METADATA_CONCURRENCY)
+conversion_semaphore = asyncio.Semaphore(MAX_CONVERSION_CONCURRENCY)
+
+
+def get_cookie_args():
+    if COOKIES_AVAILABLE and os.path.exists(COOKIES_FILE):
+        return ['--cookies', COOKIES_FILE]
+    return []
+
+
+def get_retry_args(retries: int):
+    return [
+        '--retries', str(retries),
+        '--fragment-retries', str(retries),
+        '--extractor-retries', str(retries),
+        '--retry-sleep', '1:5',
+        '--socket-timeout', '20',
+        '--no-playlist',
+    ]
+
+
+async def run_subprocess(cmd: list, timeout: int):
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+
+    try:
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
+        return process.returncode, stdout, stderr
+    except asyncio.TimeoutError:
+        process.kill()
+        try:
+            await process.wait()
+        except Exception:
+            pass
+        raise
 
 
 def get_base_ydl_opts():
@@ -71,6 +116,21 @@ app = FastAPI(
     description="YouTube to MP3 conversion API",
     version="2.0.0"
 )
+
+
+@app.on_event("startup")
+async def start_cleanup_task():
+    global cleanup_task
+    cleanup_task = asyncio.create_task(cleanup_loop())
+
+
+@app.on_event("shutdown")
+async def stop_cleanup_task():
+    global cleanup_task
+    if cleanup_task:
+        cleanup_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await cleanup_task
 
 app.add_middleware(
     CORSMiddleware,
@@ -114,6 +174,15 @@ def cleanup_old_jobs():
         if job and job.get('output_dir'):
             shutil.rmtree(job['output_dir'], ignore_errors=True)
         logger.info(f"Cleaned up expired job: {job_id}")
+
+
+async def cleanup_loop():
+    while True:
+        try:
+            await asyncio.to_thread(cleanup_old_jobs)
+        except Exception as exc:
+            logger.warning(f"Cleanup loop error: {exc}")
+        await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
 
 
 @app.get("/")
@@ -161,33 +230,26 @@ async def get_metadata(url: str = Query(..., description="YouTube URL")):
         cmd = [
             'yt-dlp',
             '--remote-components', 'ejs:github',
-            '--cookies', COOKIES_FILE,
             '--skip-download',
             '--print-json',
+            *get_retry_args(3),
+            *get_cookie_args(),
             url
         ]
-        
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        
-        try:
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(),
-                timeout=60
-            )
-        except asyncio.TimeoutError:
-            process.kill()
-            raise HTTPException(status_code=504, detail="Request timed out")
-        
-        if process.returncode != 0:
-            logger.error(f"Metadata fetch failed: {stderr.decode()}")
-            raise HTTPException(status_code=400, detail=f"Could not fetch video: {stderr.decode()[:200]}")
-        
+
+        async with metadata_semaphore:
+            try:
+                returncode, stdout, stderr = await run_subprocess(cmd, METADATA_TIMEOUT_SECONDS)
+            except asyncio.TimeoutError:
+                raise HTTPException(status_code=504, detail="Request timed out")
+
+        if returncode != 0:
+            stderr_text = stderr.decode()
+            logger.error(f"Metadata fetch failed: {stderr_text}")
+            raise HTTPException(status_code=400, detail=f"Could not fetch video: {stderr_text[:200]}")
+
         info = json.loads(stdout.decode().strip().split('\n')[-1])
-        
+
         return {
             "title": info.get('title'),
             "artist": info.get('uploader') or info.get('channel'),
@@ -222,39 +284,33 @@ async def run_conversion(job_id: str, url: str, quality: str):
         cmd = [
             'yt-dlp',
             '--remote-components', 'ejs:github',
-            '--cookies', COOKIES_FILE,
             '-x',
             '--audio-format', 'mp3',
             '--audio-quality', quality + 'K',
             '-o', output_path,
             '--print-json',
             '--newline',  # Progress on new lines
+            '--concurrent-fragments', '1',
+            *get_retry_args(5),
+            *get_cookie_args(),
             url
         ]
-        
+
         job['progress'] = "Downloading and converting..."
-        
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        
-        try:
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(),
-                timeout=1800  # 30 min timeout for very long videos
-            )
-        except asyncio.TimeoutError:
-            process.kill()
+
+        async with conversion_semaphore:
+            try:
+                returncode, stdout, stderr = await run_subprocess(cmd, CONVERSION_TIMEOUT_SECONDS)
+            except asyncio.TimeoutError:
+                job['status'] = JobStatus.FAILED
+                job['error'] = "Conversion timed out"
+                return
+
+        if returncode != 0:
+            stderr_text = stderr.decode()
+            logger.error(f"Job {job_id} failed: {stderr_text}")
             job['status'] = JobStatus.FAILED
-            job['error'] = "Conversion timed out (30 min limit)"
-            return
-        
-        if process.returncode != 0:
-            logger.error(f"Job {job_id} failed: {stderr.decode()}")
-            job['status'] = JobStatus.FAILED
-            job['error'] = f"Conversion failed: {stderr.decode()[:200]}"
+            job['error'] = f"Conversion failed: {stderr_text[:200]}"
             return
         
         stdout_text = stdout.decode()

@@ -17,11 +17,18 @@ final class ConversionService: NSObject, UNUserNotificationCenterDelegate {
     private var currentJobTask: Task<LocalTrack?, Error>?
     
     private static let pendingJobKey = "PendingConversionJob"
+    private static let jobCreationMaxRetries = 3
+    private static let jobPollingMaxErrors = 5
+    private static let jobPollingMaxDuration: TimeInterval = 35 * 60
+    private static let pollingIntervalSeconds: UInt64 = 2
+    private static let pollingMaxBackoffSeconds: UInt64 = 10
+    private static let downloadRequestTimeout: TimeInterval = 60
+    private static let downloadResourceTimeout: TimeInterval = 60 * 60
     
     private static let downloadSession: URLSession = {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = .infinity
-        config.timeoutIntervalForResource = .infinity
+        config.timeoutIntervalForRequest = downloadRequestTimeout
+        config.timeoutIntervalForResource = downloadResourceTimeout
         return URLSession(configuration: config)
     }()
     
@@ -155,6 +162,15 @@ final class ConversionService: NSObject, UNUserNotificationCenterDelegate {
             let secs = seconds % 60
             return "\(mins)m \(secs)s"
         }
+    }
+
+    private func shouldRetryStatusCode(_ statusCode: Int) -> Bool {
+        statusCode == 408 || statusCode == 429 || statusCode >= 500
+    }
+
+    private func pollDelayNanoseconds(forErrorRetries retries: Int) -> UInt64 {
+        let backoff = min(Self.pollingMaxBackoffSeconds, Self.pollingIntervalSeconds * UInt64(1 << retries))
+        return backoff * 1_000_000_000
     }
     
     @MainActor
@@ -305,14 +321,34 @@ final class ConversionService: NSObject, UNUserNotificationCenterDelegate {
         let jobsURL = URL(string: "\(CloudConfig.conversionServerURL)/jobs?url=\(encodedURL)")!
         var request = URLRequest(url: jobsURL)
         request.httpMethod = "POST"
-        
-        let (jobData, jobResponse) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = jobResponse as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw ConversionError.serverError("Failed to start conversion")
+
+        var jobResult: JobResponse?
+        for attempt in 0..<Self.jobCreationMaxRetries {
+            do {
+                let (jobData, jobResponse) = try await URLSession.shared.data(for: request)
+                guard let httpResponse = jobResponse as? HTTPURLResponse else {
+                    throw ConversionError.serverError("Invalid server response")
+                }
+                guard httpResponse.statusCode == 200 else {
+                    if shouldRetryStatusCode(httpResponse.statusCode) && attempt < Self.jobCreationMaxRetries - 1 {
+                        try await Task.sleep(nanoseconds: pollDelayNanoseconds(forErrorRetries: attempt))
+                        continue
+                    }
+                    throw ConversionError.serverError("Failed to start conversion")
+                }
+                jobResult = try JSONDecoder().decode(JobResponse.self, from: jobData)
+                break
+            } catch let error as ConversionError {
+                throw error
+            } catch {
+                if attempt == Self.jobCreationMaxRetries - 1 {
+                    throw ConversionError.serverError("Failed to start conversion after retries")
+                }
+                try await Task.sleep(nanoseconds: pollDelayNanoseconds(forErrorRetries: attempt))
+            }
         }
-        
-        guard let jobResult = try? JSONDecoder().decode(JobResponse.self, from: jobData) else {
+
+        guard let jobResult else {
             throw ConversionError.serverError("Invalid job response")
         }
         
@@ -327,8 +363,13 @@ final class ConversionService: NSObject, UNUserNotificationCenterDelegate {
         
         let statusURL = URL(string: "\(CloudConfig.conversionServerURL)/jobs/\(jobId)")!
         
+        let pollStartTime = Date()
+        var pollErrorCount = 0
         while true {
             if isCancelled { throw ConversionError.cancelled }
+            if Date().timeIntervalSince(pollStartTime) > Self.jobPollingMaxDuration {
+                throw ConversionError.serverError("Conversion timed out. Please try again.")
+            }
             
             // Update progress message with elapsed time
             await MainActor.run {
@@ -341,22 +382,36 @@ final class ConversionService: NSObject, UNUserNotificationCenterDelegate {
                 }
             }
             
-            let (statusData, _) = try await URLSession.shared.data(from: statusURL)
+            do {
+                let (statusData, statusResponse) = try await URLSession.shared.data(from: statusURL)
+                if let httpResponse = statusResponse as? HTTPURLResponse, httpResponse.statusCode == 404 {
+                    throw ConversionError.serverError("Job expired. Please try again.")
+                }
+
+                guard let status = try? JSONDecoder().decode(JobStatus.self, from: statusData) else {
+                    throw ConversionError.serverError("Failed to check job status")
+                }
             
-            guard let status = try? JSONDecoder().decode(JobStatus.self, from: statusData) else {
-                throw ConversionError.serverError("Failed to check job status")
-            }
-            
-            switch status.status {
-            case "completed":
-                break
-            case "failed":
-                throw ConversionError.serverError(status.error ?? "Conversion failed")
-            case "pending", "processing":
-                try await Task.sleep(nanoseconds: 2_000_000_000)
-                continue
-            default:
-                try await Task.sleep(nanoseconds: 2_000_000_000)
+                switch status.status {
+                case "completed":
+                    break
+                case "failed":
+                    throw ConversionError.serverError(status.error ?? "Conversion failed")
+                case "pending", "processing":
+                    try await Task.sleep(nanoseconds: Self.pollingIntervalSeconds * 1_000_000_000)
+                    continue
+                default:
+                    try await Task.sleep(nanoseconds: Self.pollingIntervalSeconds * 1_000_000_000)
+                    continue
+                }
+            } catch let error as ConversionError {
+                throw error
+            } catch {
+                pollErrorCount += 1
+                if pollErrorCount > Self.jobPollingMaxErrors {
+                    throw ConversionError.serverError("Failed to check job status. Please try again.")
+                }
+                try await Task.sleep(nanoseconds: pollDelayNanoseconds(forErrorRetries: pollErrorCount))
                 continue
             }
             
@@ -390,9 +445,14 @@ final class ConversionService: NSObject, UNUserNotificationCenterDelegate {
     
     private func resumeJob(jobId: String, url: String, videoDuration: Int?, modelContext: ModelContext) async throws -> LocalTrack {
         let statusURL = URL(string: "\(CloudConfig.conversionServerURL)/jobs/\(jobId)")!
-        
+
+        let pollStartTime = Date()
+        var pollErrorCount = 0
         while true {
             if isCancelled { throw ConversionError.cancelled }
+            if Date().timeIntervalSince(pollStartTime) > Self.jobPollingMaxDuration {
+                throw ConversionError.serverError("Conversion timed out. Please try again.")
+            }
             
             await MainActor.run {
                 let elapsed = formatElapsed(elapsedSeconds)
@@ -404,26 +464,37 @@ final class ConversionService: NSObject, UNUserNotificationCenterDelegate {
                 }
             }
             
-            let (statusData, statusResponse) = try await URLSession.shared.data(from: statusURL)
-            
-            if let httpResponse = statusResponse as? HTTPURLResponse, httpResponse.statusCode == 404 {
-                throw ConversionError.serverError("Job expired. Please try again.")
-            }
-            
-            guard let status = try? JSONDecoder().decode(JobStatus.self, from: statusData) else {
-                throw ConversionError.serverError("Failed to check job status")
-            }
-            
-            switch status.status {
-            case "completed":
-                break
-            case "failed":
-                throw ConversionError.serverError(status.error ?? "Conversion failed")
-            case "pending", "processing":
-                try await Task.sleep(nanoseconds: 2_000_000_000)
-                continue
-            default:
-                try await Task.sleep(nanoseconds: 2_000_000_000)
+            do {
+                let (statusData, statusResponse) = try await URLSession.shared.data(from: statusURL)
+
+                if let httpResponse = statusResponse as? HTTPURLResponse, httpResponse.statusCode == 404 {
+                    throw ConversionError.serverError("Job expired. Please try again.")
+                }
+
+                guard let status = try? JSONDecoder().decode(JobStatus.self, from: statusData) else {
+                    throw ConversionError.serverError("Failed to check job status")
+                }
+
+                switch status.status {
+                case "completed":
+                    break
+                case "failed":
+                    throw ConversionError.serverError(status.error ?? "Conversion failed")
+                case "pending", "processing":
+                    try await Task.sleep(nanoseconds: Self.pollingIntervalSeconds * 1_000_000_000)
+                    continue
+                default:
+                    try await Task.sleep(nanoseconds: Self.pollingIntervalSeconds * 1_000_000_000)
+                    continue
+                }
+            } catch let error as ConversionError {
+                throw error
+            } catch {
+                pollErrorCount += 1
+                if pollErrorCount > Self.jobPollingMaxErrors {
+                    throw ConversionError.serverError("Failed to check job status. Please try again.")
+                }
+                try await Task.sleep(nanoseconds: pollDelayNanoseconds(forErrorRetries: pollErrorCount))
                 continue
             }
             break
