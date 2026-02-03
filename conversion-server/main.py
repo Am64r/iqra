@@ -392,6 +392,8 @@ async def get_job_status(job_id: str):
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
+    logger.info(f"Job {job_id} status: {job['status']} - {job['progress']}")
+    
     response = {
         "job_id": job_id,
         "status": job['status'],
