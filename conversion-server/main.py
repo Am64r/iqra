@@ -81,7 +81,7 @@ def get_retry_args(retries: int):
     ]
 
 
-async def run_subprocess(cmd: list, timeout: int):
+async def run_subprocess(cmd: list, timeout: int, log_output: bool = False):
     process = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
@@ -89,8 +89,29 @@ async def run_subprocess(cmd: list, timeout: int):
     )
 
     try:
-        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
-        return process.returncode, stdout, stderr
+        if log_output:
+            # Stream output in real-time for debugging
+            stdout_chunks = []
+            stderr_chunks = []
+            
+            async def read_stream(stream, chunks, prefix):
+                async for line in stream:
+                    chunks.append(line)
+                    logger.info(f"{prefix}: {line.decode().rstrip()}")
+            
+            await asyncio.wait_for(
+                asyncio.gather(
+                    read_stream(process.stdout, stdout_chunks, "yt-dlp"),
+                    read_stream(process.stderr, stderr_chunks, "yt-dlp stderr"),
+                    process.wait()
+                ),
+                timeout=timeout
+            )
+            
+            return process.returncode, b''.join(stdout_chunks), b''.join(stderr_chunks)
+        else:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
+            return process.returncode, stdout, stderr
     except asyncio.TimeoutError:
         process.kill()
         try:
@@ -290,6 +311,8 @@ async def run_conversion(job_id: str, url: str, quality: str):
             '-o', output_path,
             '--print-json',
             '--newline',
+            '--verbose',  # Show detailed progress logs
+            '--progress',  # Ensure progress is shown
             *get_retry_args(5),
             *get_cookie_args(),
             url
@@ -299,7 +322,7 @@ async def run_conversion(job_id: str, url: str, quality: str):
 
         async with conversion_semaphore:
             try:
-                returncode, stdout, stderr = await run_subprocess(cmd, CONVERSION_TIMEOUT_SECONDS)
+                returncode, stdout, stderr = await run_subprocess(cmd, CONVERSION_TIMEOUT_SECONDS, log_output=True)
             except asyncio.TimeoutError:
                 job['status'] = JobStatus.FAILED
                 job['error'] = "Conversion timed out"
