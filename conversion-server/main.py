@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-import yt_dlp
 import tempfile
 import os
 import urllib.parse
