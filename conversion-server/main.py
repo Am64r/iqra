@@ -307,7 +307,7 @@ async def run_conversion(job_id: str, url: str, quality: str):
     
     tmpdir = tempfile.mkdtemp(dir=JOBS_DIR)
     job['output_dir'] = tmpdir
-    output_path = os.path.join(tmpdir, "audio.mp3")
+    output_path = os.path.join(tmpdir, "audio.m4a")
     
     # #region agent log - timing instrumentation
     import time as _time
@@ -319,10 +319,9 @@ async def run_conversion(job_id: str, url: str, quality: str):
         cmd = [
             'yt-dlp',
             '--remote-components', 'ejs:github',
-            '-f', 'bestaudio',  # Only download audio stream (much faster)
+            '-f', 'bestaudio[ext=m4a]/bestaudio',  # Prefer m4a (AAC) to avoid re-encoding
             '-x',
-            '--audio-format', 'mp3',
-            '--audio-quality', quality + 'K',
+            '--audio-format', 'm4a',  # AAC in m4a container - native iOS support
             '-o', output_path,
             '--print-json',
             '--newline',
@@ -370,7 +369,7 @@ async def run_conversion(job_id: str, url: str, quality: str):
         
         if not os.path.exists(output_path):
             for f in os.listdir(tmpdir):
-                if f.endswith('.mp3'):
+                if f.endswith('.m4a') or f.endswith('.mp3'):
                     output_path = os.path.join(tmpdir, f)
                     break
             else:
@@ -491,15 +490,19 @@ async def download_job(job_id: str):
                 shutil.rmtree(job['output_dir'], ignore_errors=True)
             jobs.pop(job_id, None)
     
+    # Determine file extension and mime type
+    ext = os.path.splitext(output_path)[1]  # .m4a or .mp3
+    mime_type = "audio/mp4" if ext == ".m4a" else "audio/mpeg"
+    
     return StreamingResponse(
         iter_file(),
-        media_type="audio/mpeg",
+        media_type=mime_type,
         headers={
             "Content-Length": str(job['file_size']),
             "X-Track-Title": safe_title,
             "X-Track-Artist": safe_artist,
             "X-Track-Duration": str(job['duration']),
-            "Content-Disposition": f'attachment; filename="{safe_title}.mp3"',
+            "Content-Disposition": f'attachment; filename="{safe_title}{ext}"',
             "Cache-Control": "no-cache",
         }
     )

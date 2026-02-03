@@ -213,7 +213,7 @@ final class ConversionService: NSObject, UNUserNotificationCenterDelegate {
             
             progressMessage = "Saving..."
             let trackId = UUID()
-            let fileName = "imports/\(trackId.uuidString).mp3"
+            let fileName = "imports/\(trackId.uuidString).m4a"
             let destURL = AppConfig.documentsURL.appendingPathComponent(fileName)
             
             try FileManager.default.createDirectory(at: AppConfig.importsDirectoryURL, withIntermediateDirectories: true)
@@ -436,7 +436,7 @@ final class ConversionService: NSObject, UNUserNotificationCenterDelegate {
             .removingPercentEncoding ?? metadata.artist ?? "Unknown"
         let duration = Int(httpDownloadResponse.value(forHTTPHeaderField: "X-Track-Duration") ?? "") ?? metadata.duration ?? 0
         
-        let persistentURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mp3")
+        let persistentURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".m4a")
         try FileManager.default.moveItem(at: tempURL, to: persistentURL)
         clearPendingJob()
         
@@ -519,7 +519,7 @@ final class ConversionService: NSObject, UNUserNotificationCenterDelegate {
         await MainActor.run { progressMessage = "Saving..." }
         
         let trackId = UUID()
-        let fileName = "imports/\(trackId.uuidString).mp3"
+        let fileName = "imports/\(trackId.uuidString).m4a"
         let destURL = AppConfig.documentsURL.appendingPathComponent(fileName)
         
         try FileManager.default.createDirectory(at: AppConfig.importsDirectoryURL, withIntermediateDirectories: true)
