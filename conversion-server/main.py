@@ -85,7 +85,8 @@ async def run_subprocess(cmd: list, timeout: int, log_output: bool = False):
     process = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
+        stderr=asyncio.subprocess.PIPE,
+        limit=1024 * 1024  # 1MB line buffer to handle verbose output
     )
 
     try:
@@ -95,9 +96,17 @@ async def run_subprocess(cmd: list, timeout: int, log_output: bool = False):
             stderr_chunks = []
             
             async def read_stream(stream, chunks, prefix):
-                async for line in stream:
-                    chunks.append(line)
-                    logger.info(f"{prefix}: {line.decode().rstrip()}")
+                try:
+                    async for line in stream:
+                        chunks.append(line)
+                        # Truncate very long lines in logs (but keep full data)
+                        log_line = line.decode(errors='replace').rstrip()
+                        if len(log_line) > 500:
+                            log_line = log_line[:500] + '... [truncated]'
+                        logger.info(f"{prefix}: {log_line}")
+                except ValueError as e:
+                    # Handle line limit errors gracefully - continue with what we have
+                    logger.warning(f"{prefix}: Stream read error (line too long): {e}")
             
             await asyncio.wait_for(
                 asyncio.gather(
@@ -312,7 +321,6 @@ async def run_conversion(job_id: str, url: str, quality: str):
             '--print-json',
             '--newline',
             '--verbose',  # Show detailed progress logs
-            '--progress',  # Ensure progress is shown
             *get_retry_args(5),
             *get_cookie_args(),
             url
