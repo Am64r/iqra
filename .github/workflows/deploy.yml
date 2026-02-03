@@ -1,4 +1,4 @@
-name: Deploy to Fly.io
+name: Fly Deploy
 
 on:
   push:
@@ -10,20 +10,12 @@ on:
 
 jobs:
   deploy:
-    name: Deploy app to Fly.io
+    name: Deploy app
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./conversion-server
-    
+    concurrency: deploy-group
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Fly.io CLI
-        uses: superfly/flyctl-actions/setup-flyctl@master
-
-      - name: Deploy to Fly.io
-        run: flyctl deploy --remote-only
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: cd conversion-server && flyctl deploy --remote-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
