@@ -32,6 +32,6 @@ primary_region = 'iad'
     soft_limit = 20
 
 [[vm]]
-  cpu_kind = 'shared'
-  cpus = 1
-  memory_mb = 512
+  cpu_kind = 'performance'
+  cpus = 4
+  memory_mb = 2048
