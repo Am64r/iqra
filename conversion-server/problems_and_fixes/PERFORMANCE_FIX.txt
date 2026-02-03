@@ -1,0 +1,108 @@
+YOUTUBE AUDIO CONVERSION PERFORMANCE FIX
+========================================
+
+Date: February 2026
+
+PROBLEM
+-------
+YouTube audio downloads that took 3 seconds locally were taking 12+ minutes on 
+the Fly.io server with a shared CPU (1 vCPU, 512MB RAM).
+
+SYMPTOMS
+--------
+- 1-hour audio file: 3 seconds locally, 12 minutes on server
+- Server logs showed most time spent in ffmpeg MP3 encoding
+- CPU was the bottleneck, not network
+
+ROOT CAUSE ANALYSIS
+-------------------
+The slow performance had multiple contributing factors:
+
+1. MP3 RE-ENCODING (Primary Issue)
+   - yt-dlp was downloading opus/webm format (format 251) 
+   - ffmpeg then re-encoded the entire audio to MP3 (libmp3lame)
+   - Re-encoding a 1-hour file on a weak shared CPU took ~12 minutes
+   - On a performance CPU, it still took 73 seconds
+
+2. WRONG FORMAT SELECTION
+   - `-f bestaudio` selected opus (format 251) because YouTube ranks it 
+     higher quality than AAC
+   - This forced a full re-encode to MP3
+
+3. CONCURRENT FRAGMENT LIMIT (Previous Issue)
+   - Had `--concurrent-fragments 1` which serialized fragment downloads
+   - Removed this to allow parallel downloads
+
+4. MULTIPLE MACHINES CAUSING 404s (Infrastructure Issue)
+   - Fly.io was running 2 machines
+   - In-memory jobs dict wasn't shared between machines
+   - Job created on machine A, polled on machine B = 404 Not Found
+   - Fixed by ensuring only 1 machine runs
+
+THE FIX
+-------
+Changed from MP3 to M4A (AAC) format:
+
+BEFORE:
+  -f bestaudio
+  --audio-format mp3
+  --audio-quality 128K
+
+AFTER:
+  -f bestaudio[ext=m4a]/bestaudio   # Prefer m4a format from YouTube
+  --audio-format m4a                 # Output as m4a (AAC)
+
+WHY THIS WORKS
+--------------
+1. YouTube provides AAC audio in m4a container (format 140)
+2. By preferring m4a, yt-dlp downloads AAC directly
+3. Since source and target are both m4a, NO RE-ENCODING needed
+4. ffmpeg just does a quick remux (`-c copy`) to fix the container
+5. iOS natively supports m4a/AAC playback
+
+PERFORMANCE RESULTS
+-------------------
+Same 1-hour video, same shared CPU (1 vCPU, 512MB):
+
+| Approach              | Time      | Speedup |
+|-----------------------|-----------|---------|
+| MP3 (original)        | 721.5s    | 1x      |
+| MP3 (performance CPU) | 80s       | 9x      |
+| M4A (shared CPU)      | 27s       | 27x     |
+
+The cheapest server option is now faster than the expensive one was!
+
+FLY.IO CONFIGURATION
+--------------------
+fly.toml settings for single-machine operation:
+
+[http_service]
+  auto_stop_machines = 'off'      # Don't stop the machine
+  auto_start_machines = false     # Don't spawn additional machines  
+  min_machines_running = 1        # Keep exactly 1 running
+
+[[vm]]
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 512
+
+COST IMPACT
+-----------
+- Performance CPU: ~$30/month
+- Shared CPU: ~$5/month or less (with free tier)
+- M4A fix makes shared CPU viable = significant cost savings
+
+IOS APP CHANGES
+---------------
+Updated file extensions from .mp3 to .m4a in:
+- ConversionService.swift (3 locations)
+
+iOS natively supports m4a via AVFoundation, no player changes needed.
+
+NOTES
+-----
+- Format 140 (m4a/AAC) is ~128kbps, good quality for spoken audio
+- If a video doesn't have m4a available, falls back to bestaudio + conversion
+- The `[FixupM4a]` step is just a quick container fix, not re-encoding
+- Log line to confirm no conversion: "[ExtractAudio] Not converting audio...
+  file is already in target format m4a"

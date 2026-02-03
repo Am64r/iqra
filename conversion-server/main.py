@@ -309,11 +309,9 @@ async def run_conversion(job_id: str, url: str, quality: str):
     job['output_dir'] = tmpdir
     output_path = os.path.join(tmpdir, "audio.m4a")
     
-    # #region agent log - timing instrumentation
     import time as _time
     _start_time = _time.time()
     logger.info(f"[TIMING] Job {job_id}: Starting conversion at {_start_time}")
-    # #endregion
     
     try:
         cmd = [
@@ -325,7 +323,7 @@ async def run_conversion(job_id: str, url: str, quality: str):
             '-o', output_path,
             '--print-json',
             '--newline',
-            '--verbose',  # Show detailed progress logs
+            '--verbose',
             *get_retry_args(5),
             *get_cookie_args(),
             url
@@ -333,17 +331,13 @@ async def run_conversion(job_id: str, url: str, quality: str):
 
         job['progress'] = "Downloading and converting..."
         
-        # #region agent log
         logger.info(f"[TIMING] Job {job_id}: yt-dlp command starting")
-        # #endregion
 
         async with conversion_semaphore:
             try:
                 returncode, stdout, stderr = await run_subprocess(cmd, CONVERSION_TIMEOUT_SECONDS, log_output=True)
-                # #region agent log
                 _end_time = _time.time()
                 logger.info(f"[TIMING] Job {job_id}: yt-dlp completed in {_end_time - _start_time:.1f}s, returncode={returncode}")
-                # #endregion
             except asyncio.TimeoutError:
                 job['status'] = JobStatus.FAILED
                 job['error'] = "Conversion timed out"
@@ -381,10 +375,8 @@ async def run_conversion(job_id: str, url: str, quality: str):
         job['file_size'] = os.path.getsize(output_path)
         job['status'] = JobStatus.COMPLETED
         job['progress'] = "Complete"
-        # #region agent log
         _total_time = _time.time() - _start_time
         logger.info(f"[TIMING] Job {job_id}: TOTAL completed in {_total_time:.1f}s, file_size={job['file_size']} bytes")
-        # #endregion
         logger.info(f"Job {job_id} completed: {job['title']} ({job['file_size']} bytes)")
         
     except Exception as e:
