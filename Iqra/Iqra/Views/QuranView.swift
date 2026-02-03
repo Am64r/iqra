@@ -29,7 +29,7 @@ struct QuranView: View {
                                 downloadProgress: downloadManager.progress(for: track.id),
                                 isPlaying: playerService.currentTrackId == track.id && playerService.isPlaying,
                                 onPlay: { playerService.play(track) },
-                                onDownload: { Task { try? await downloadManager.download(track, modelContext: modelContext) } }
+                                onDownload: { Task { @MainActor in try? await downloadManager.download(track, modelContext: modelContext) } }
                             )
                             .listRowBackground(Color.clear)
                         }
@@ -67,7 +67,7 @@ struct QuranView: View {
                 .foregroundStyle(Theme.textSecondary)
         } actions: {
             Button("Refresh") {
-                Task { await catalogService.fetchCatalog() }
+                Task { @MainActor in await catalogService.fetchCatalog() }
             }
             .buttonStyle(.borderedProminent)
             .tint(Theme.accent)

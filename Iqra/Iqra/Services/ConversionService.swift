@@ -91,7 +91,7 @@ final class ConversionService: NSObject, UNUserNotificationCenterDelegate {
         elapsedSeconds = Int(Date().timeIntervalSince(pending.startTime))
         startProgressTimer()
         
-        currentJobTask = Task {
+        currentJobTask = Task { @MainActor in
             defer {
                 Task { @MainActor in
                     self.isConverting = false
@@ -139,7 +139,7 @@ final class ConversionService: NSObject, UNUserNotificationCenterDelegate {
     @MainActor
     private func startProgressTimer() {
         elapsedSeconds = 0
-        progressTimer = Task {
+        progressTimer = Task { @MainActor in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 if Task.isCancelled { break }

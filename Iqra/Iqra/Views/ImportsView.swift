@@ -150,7 +150,7 @@ struct ImportsView: View {
         youtubeURL = ""
         importError = nil
         
-        Task {
+        Task { @MainActor in
             do {
                 _ = try await conversionService.importFromYouTube(url: urlToImport, modelContext: modelContext)
             } catch let error as ConversionError where error == .cancelled {
