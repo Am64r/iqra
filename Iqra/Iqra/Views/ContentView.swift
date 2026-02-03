@@ -7,36 +7,47 @@ struct ContentView: View {
     @Environment(CatalogService.self) private var catalogService
     @Environment(ConversionService.self) private var conversionService
     @State private var selectedTab = 0
-    @State private var showingPlayer = false
-    @Namespace private var playerTransition
+    @State private var playerExpanded = false
+    
+    private let expandedTopGap: CGFloat = 86
+    private let collapsedPlayerHeight: CGFloat = 64 * 1.5
     
     var body: some View {
-        ZStack(alignment: .bottom) {
-            TabView(selection: $selectedTab) {
-                LibraryView()
-                    .tabItem { Label("Library", systemImage: "books.vertical") }
-                    .tag(0)
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                TabView(selection: $selectedTab) {
+                    LibraryView()
+                        .tabItem { Label("Library", systemImage: "books.vertical") }
+                        .tag(0)
+                    
+                    QuranView()
+                        .tabItem { Label("Quran", systemImage: "book") }
+                        .tag(1)
+                    
+                    ImportsView()
+                        .tabItem { Label("Imports", systemImage: "square.and.arrow.down") }
+                        .tag(2)
+                }
                 
-                QuranView()
-                    .tabItem { Label("Quran", systemImage: "book") }
-                    .tag(1)
-                
-                ImportsView()
-                    .tabItem { Label("Imports", systemImage: "square.and.arrow.down") }
-                    .tag(2)
-            }
-            
-            if playerService.currentTrack != nil {
-                NowPlayingBar(showingPlayer: $showingPlayer)
-                    .padding(.bottom, 49)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .zIndex(1)
+                // Expandable player overlay
+                if playerService.currentTrack != nil {
+                    let topGap = geometry.safeAreaInsets.top + expandedTopGap
+                    let collapsedScale = collapsedPlayerHeight / 64
+                    ExpandablePlayerView(isExpanded: $playerExpanded, collapsedScale: collapsedScale)
+                        .frame(maxWidth: .infinity)
+                        .frame(
+                            height: playerExpanded ? geometry.size.height - topGap : collapsedPlayerHeight
+                        )
+                        .padding(.horizontal, playerExpanded ? 0 : 8)
+                        .padding(.bottom, playerExpanded ? 0 : 57)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .zIndex(1)
+                }
             }
         }
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: playerService.currentTrack != nil)
-        .fullScreenCover(isPresented: $showingPlayer) {
-            PlayerView()
-        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: playerService.currentTrack != nil)
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: playerExpanded)
+        .ignoresSafeArea(edges: playerExpanded ? .all : [])
         .preferredColorScheme(.dark)
         .task {
             await catalogService.fetchCatalog()

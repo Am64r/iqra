@@ -1,6 +1,6 @@
-# Iqra - Personal Audio Library
+# Iqra - Quran Audio Library
 
-A personal Quran audio library iOS app with YouTube import support.
+An iOS app for browsing and playing Quran recitations with YouTube import support.
 
 ## Architecture
 
@@ -96,6 +96,31 @@ iOS App                              Fly.io Server
 - Playback speed control
 - Search tracks
 
+## Setup
+
+See the [setup guide](setup/) for detailed instructions:
+
+1. [Cloudflare R2 Setup](setup/01-cloudflare-r2-setup.md) - Configure storage for audio files
+2. [Generate Catalog](setup/02-generate-catalog.md) - Create track catalog from your MP3s
+3. [TestFlight Setup](setup/03-testflight-setup.md) - Distribute via TestFlight (optional)
+
+## Requirements
+
+- iOS 17.0+
+- Xcode 15.0+
+- Swift 5.9+
+- Python 3.12+ (for catalog generation)
+- Cloudflare R2 account (free tier works)
+- Fly.io account (for conversion server, free tier works)
+
+## Configuration
+
+Before building:
+
+1. Update `Iqra/Iqra/Config/CloudConfig.swift` with your R2 bucket URL
+2. Update bundle identifier in Xcode if needed (currently `com.theamrelhady.Iqra`)
+3. Deploy conversion server to Fly.io (see `conversion-server/README.md`)
+
 ## Adding More Tracks
 
 1. Add MP3s to your local folder
@@ -106,4 +131,4 @@ iOS App                              Fly.io Server
 
 ## License
 
-MIT
+MIT License - see [LICENSE](LICENSE) file for details.

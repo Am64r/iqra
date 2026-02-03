@@ -45,6 +45,7 @@ struct LibraryView: View {
                     }
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
+                    .contentMargins(.bottom, 80)
                     .background(Theme.background)
                 }
             }

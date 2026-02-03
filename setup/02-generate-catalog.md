@@ -7,7 +7,7 @@ The app uses a `catalog.json` file in your R2 bucket to know what tracks are ava
 Run this from your local Quran folder:
 
 ```bash
-cd /Users/amr/iqra/setup/scripts
+cd setup/scripts
 
 # Generate catalog.json from your local files
 python generate_catalog.py /path/to/your/quran catalog.json
@@ -56,7 +56,7 @@ rclone copy catalog.json r2:iqra-audio/
 
 Open in browser:
 ```
-https://pub-6feee86591a64e2c84327292d1713d26.r2.dev/catalog.json
+https://pub-{YOUR_HASH}.r2.dev/catalog.json
 ```
 
 You should see your catalog JSON.

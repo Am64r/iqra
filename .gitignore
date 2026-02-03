@@ -81,3 +81,6 @@ logs/
 *.tmp
 *.temp
 .cache/
+
+# Example catalog (users should generate their own)
+# setup/scripts/catalog.json
