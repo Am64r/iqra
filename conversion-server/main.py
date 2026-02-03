@@ -283,13 +283,13 @@ async def run_conversion(job_id: str, url: str, quality: str):
         cmd = [
             'yt-dlp',
             '--remote-components', 'ejs:github',
+            '-f', 'bestaudio',  # Only download audio stream (much faster)
             '-x',
             '--audio-format', 'mp3',
             '--audio-quality', quality + 'K',
             '-o', output_path,
             '--print-json',
-            '--newline',  # Progress on new lines
-            '--concurrent-fragments', '1',
+            '--newline',
             *get_retry_args(5),
             *get_cookie_args(),
             url
