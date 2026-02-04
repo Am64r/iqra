@@ -3,9 +3,9 @@
 
 FROM python:3.12-slim
 
-# Install ffmpeg and deno (required for yt-dlp YouTube extraction)
+# Install ffmpeg, git, and deno (required for yt-dlp YouTube extraction)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg curl unzip && \
+    apt-get install -y --no-install-recommends ffmpeg curl unzip git && \
     curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh && \
     apt-get remove -y curl unzip && \
     apt-get autoremove -y && \
@@ -20,6 +20,11 @@ WORKDIR /app
 # Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Install latest yt-dlp nightly and EJS solver for freshest YouTube fixes
+RUN pip install --no-cache-dir --upgrade \
+    "yt-dlp[default] @ https://github.com/yt-dlp/yt-dlp/archive/master.tar.gz" \
+    "yt-dlp-ejs @ https://github.com/yt-dlp/ejs/archive/master.tar.gz"
 
 # Copy application code
 COPY main.py .
