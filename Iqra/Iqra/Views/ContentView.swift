@@ -30,7 +30,7 @@ struct ContentView: View {
                 }
                 
                 // Expandable player overlay
-                if playerService.currentTrack != nil {
+                if playerService.currentTrackId != nil {
                     let topGap = geometry.safeAreaInsets.top + expandedTopGap
                     let collapsedScale = collapsedPlayerHeight / 64
                     ExpandablePlayerView(isExpanded: $playerExpanded, collapsedScale: collapsedScale)
@@ -45,7 +45,7 @@ struct ContentView: View {
                 }
             }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: playerService.currentTrack != nil)
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: playerService.currentTrackId != nil)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: playerExpanded)
         .ignoresSafeArea(edges: playerExpanded ? .all : [])
         .preferredColorScheme(.dark)

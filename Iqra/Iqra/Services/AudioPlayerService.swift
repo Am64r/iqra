@@ -16,7 +16,9 @@ final class AudioPlayerService {
     private(set) var currentIndex: Int = 0
     private(set) var currentTrackId: UUID?
     private(set) var currentArtworkURL: URL?
-    
+    private(set) var activeTimespan: TrackTimespan?
+    private(set) var isLooping = false
+
     private var player: AVPlayer?
     private var timeObserver: Any?
     private var cancellables = Set<AnyCancellable>()
@@ -98,11 +100,27 @@ final class AudioPlayerService {
     }
     
     func seekForward(by seconds: TimeInterval = 15) {
-        seek(to: min(currentTime + seconds, duration))
+        let maxTime = isLooping ? (activeTimespan?.endTime ?? duration) : duration
+        seek(to: min(currentTime + seconds, maxTime))
     }
-    
+
     func seekBackward(by seconds: TimeInterval = 15) {
-        seek(to: max(currentTime - seconds, 0))
+        let minTime = isLooping ? (activeTimespan?.startTime ?? 0) : 0
+        seek(to: max(currentTime - seconds, minTime))
+    }
+
+    func activateTimespan(_ timespan: TrackTimespan) {
+        activeTimespan = timespan
+        isLooping = true
+        if currentTime < timespan.startTime || currentTime > timespan.endTime {
+            seek(to: timespan.startTime)
+        }
+        if !isPlaying { resume() }
+    }
+
+    func deactivateTimespan() {
+        activeTimespan = nil
+        isLooping = false
     }
     
     func setPlaybackRate(_ rate: Float) {
@@ -195,11 +213,25 @@ final class AudioPlayerService {
             return
         }
         
+        let displayTitle: String
+        let displayDuration: TimeInterval
+        let displayElapsed: TimeInterval
+
+        if isLooping, let span = activeTimespan {
+            displayTitle = "\(span.name) (\(span.formattedRange))"
+            displayDuration = span.endTime - span.startTime
+            displayElapsed = max(0, currentTime - span.startTime)
+        } else {
+            displayTitle = track.title
+            displayDuration = duration
+            displayElapsed = currentTime
+        }
+
         var nowPlayingInfo: [String: Any] = [
-            MPMediaItemPropertyTitle: track.title,
+            MPMediaItemPropertyTitle: displayTitle,
             MPMediaItemPropertyArtist: track.artist ?? "Unknown Artist",
-            MPMediaItemPropertyPlaybackDuration: duration,
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime,
+            MPMediaItemPropertyPlaybackDuration: displayDuration,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: displayElapsed,
             MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? playbackRate : 0,
             MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
             MPMediaItemPropertyMediaType: MPMediaType.music.rawValue
@@ -322,7 +354,8 @@ final class AudioPlayerService {
     
     private func playCurrentTrack() {
         guard currentIndex < queue.count else { return }
-        
+        deactivateTimespan()
+
         let track = queue[currentIndex]
         guard let url = track.getPlaybackURL() else { return }
         
@@ -375,9 +408,18 @@ final class AudioPlayerService {
         
         let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
         timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-            self?.currentTime = time.seconds
+            guard let self else { return }
+            self.currentTime = time.seconds
+
+            if self.isLooping, let span = self.activeTimespan {
+                if time.seconds >= span.endTime {
+                    self.player?.seek(to: CMTime(seconds: span.startTime, preferredTimescale: 600))
+                    self.currentTime = span.startTime
+                }
+            }
+
             if Int(time.seconds) % 5 == 0 {
-                self?.updateNowPlayingInfo()
+                self.updateNowPlayingInfo()
             }
         }
         
@@ -387,6 +429,11 @@ final class AudioPlayerService {
     }
     
     private func handleTrackEnded() {
+        if isLooping, let span = activeTimespan {
+            seek(to: span.startTime)
+            resume()
+            return
+        }
         if hasNext {
             next()
         } else {

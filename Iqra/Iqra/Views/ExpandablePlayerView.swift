@@ -10,6 +10,7 @@ struct ExpandablePlayerView: View {
     @State private var dragOffset: CGFloat = 0
     @State private var progressDragging = false
     @State private var dragProgress: Double = 0
+    @State private var showTimespanSheet = false
     
     private let expandThreshold: CGFloat = 100
     
@@ -189,7 +190,11 @@ struct ExpandablePlayerView: View {
                 // Controls
                 playbackControlsView
                     .padding(.top, 16)
-                
+
+                // Loop button
+                loopButton
+                    .padding(.top, 12)
+
                 Spacer()
             }
             .padding(.bottom, safeArea.bottom + 16)
@@ -237,11 +242,32 @@ struct ExpandablePlayerView: View {
                     Capsule()
                         .fill(Theme.textPrimary.opacity(0.2))
                         .frame(height: 4)
-                    
+
+                    // Timespan range indicator
+                    if playerService.isLooping, let span = playerService.activeTimespan, playerService.duration > 0 {
+                        let startFrac = span.startTime / playerService.duration
+                        let endFrac = min(span.endTime / playerService.duration, 1.0)
+
+                        Capsule()
+                            .fill(Theme.accent.opacity(0.25))
+                            .frame(width: geo.size.width * (endFrac - startFrac), height: 4)
+                            .offset(x: geo.size.width * startFrac)
+
+                        Rectangle()
+                            .fill(Theme.accent.opacity(0.6))
+                            .frame(width: 2, height: 10)
+                            .offset(x: geo.size.width * startFrac - 1)
+
+                        Rectangle()
+                            .fill(Theme.accent.opacity(0.6))
+                            .frame(width: 2, height: 10)
+                            .offset(x: geo.size.width * endFrac - 1)
+                    }
+
                     Capsule()
                         .fill(Theme.accent)
                         .frame(width: geo.size.width * (progressDragging ? dragProgress : playerService.progress), height: 4)
-                    
+
                     Circle()
                         .fill(Theme.accent)
                         .frame(width: progressDragging ? 14 : 0, height: progressDragging ? 14 : 0)
@@ -316,6 +342,40 @@ struct ExpandablePlayerView: View {
             .foregroundStyle(playerService.hasNext ? Theme.textPrimary : Theme.textTertiary)
         }
         .padding(.horizontal, 16)
+    }
+
+    // MARK: - Loop Button
+
+    private var loopButton: some View {
+        Button {
+            showTimespanSheet = true
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: playerService.isLooping ? "repeat.circle.fill" : "repeat.circle")
+                    .font(.title3)
+                if playerService.isLooping, let span = playerService.activeTimespan {
+                    Text(span.name)
+                        .font(.caption.weight(.medium))
+                        .lineLimit(1)
+                }
+            }
+            .foregroundStyle(playerService.isLooping ? Theme.accent : Theme.textSecondary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(
+                playerService.isLooping ? Theme.accent.opacity(0.15) : Color.clear,
+                in: Capsule()
+            )
+        }
+        .sheet(isPresented: $showTimespanSheet) {
+            TimespanSheetView(
+                trackId: playerService.currentTrackId ?? UUID(),
+                trackDuration: playerService.duration
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(.ultraThinMaterial)
+        }
     }
 }
 

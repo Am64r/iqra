@@ -9,7 +9,7 @@ struct IqraApp: App {
     init() {
         // Initialize SwiftData container
         do {
-            let schema = Schema([LocalTrack.self])
+            let schema = Schema([LocalTrack.self, TrackTimespan.self])
             let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
             modelContainer = try ModelContainer(for: schema, configurations: [config])
         } catch {
