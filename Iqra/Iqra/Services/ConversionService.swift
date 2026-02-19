@@ -165,7 +165,7 @@ final class ConversionService: NSObject, UNUserNotificationCenterDelegate {
     }
 
     private func shouldRetryStatusCode(_ statusCode: Int) -> Bool {
-        statusCode == 408 || statusCode == 429 || statusCode >= 500
+        statusCode == 408 || statusCode == 429 || (statusCode >= 500 && statusCode != 503)
     }
 
     private func pollDelayNanoseconds(forErrorRetries retries: Int) -> UInt64 {
@@ -330,6 +330,10 @@ final class ConversionService: NSObject, UNUserNotificationCenterDelegate {
                     throw ConversionError.serverError("Invalid server response")
                 }
                 guard httpResponse.statusCode == 200 else {
+                    if httpResponse.statusCode == 503 {
+                        let detail = (try? JSONDecoder().decode([String: String].self, from: jobData))?["detail"]
+                        throw ConversionError.serverError(detail ?? "Queue full, please try again in a few minutes")
+                    }
                     if shouldRetryStatusCode(httpResponse.statusCode) && attempt < Self.jobCreationMaxRetries - 1 {
                         try await Task.sleep(nanoseconds: pollDelayNanoseconds(forErrorRetries: attempt))
                         continue

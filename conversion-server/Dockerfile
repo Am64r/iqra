@@ -21,10 +21,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install latest yt-dlp nightly and EJS solver for freshest YouTube fixes
+# Install latest yt-dlp nightly with EJS solver for freshest YouTube fixes
 RUN pip install --no-cache-dir --upgrade \
-    "yt-dlp[default] @ https://github.com/yt-dlp/yt-dlp/archive/master.tar.gz" \
-    "yt-dlp-ejs @ https://github.com/yt-dlp/ejs/archive/master.tar.gz"
+    "yt-dlp[default] @ https://github.com/yt-dlp/yt-dlp/archive/master.tar.gz"
 
 # Copy application code
 COPY main.py .

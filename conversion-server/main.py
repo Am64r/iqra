@@ -29,6 +29,7 @@ METADATA_TIMEOUT_SECONDS = int(os.environ.get("METADATA_TIMEOUT_SECONDS", "90"))
 CONVERSION_TIMEOUT_SECONDS = int(os.environ.get("CONVERSION_TIMEOUT_SECONDS", "1800"))
 MAX_METADATA_CONCURRENCY = int(os.environ.get("MAX_METADATA_CONCURRENCY", "2"))
 MAX_CONVERSION_CONCURRENCY = int(os.environ.get("MAX_CONVERSION_CONCURRENCY", "1"))
+MAX_QUEUED_JOBS = int(os.environ.get("MAX_QUEUED_JOBS", "5"))
 CLEANUP_INTERVAL_SECONDS = int(os.environ.get("CLEANUP_INTERVAL_SECONDS", "300"))
 
 os.makedirs(JOBS_DIR, exist_ok=True)
@@ -62,6 +63,8 @@ def setup_cookies():
 COOKIES_AVAILABLE = setup_cookies()
 metadata_semaphore = asyncio.Semaphore(MAX_METADATA_CONCURRENCY)
 conversion_semaphore = asyncio.Semaphore(MAX_CONVERSION_CONCURRENCY)
+# Global semaphore: only 1 yt-dlp process at a time to stay within 512MB RAM
+ytdlp_semaphore = asyncio.Semaphore(1)
 
 
 def get_cookie_args():
@@ -267,10 +270,11 @@ async def get_metadata(url: str = Query(..., description="YouTube URL")):
         ]
 
         async with metadata_semaphore:
-            try:
-                returncode, stdout, stderr = await run_subprocess(cmd, METADATA_TIMEOUT_SECONDS)
-            except asyncio.TimeoutError:
-                raise HTTPException(status_code=504, detail="Request timed out")
+            async with ytdlp_semaphore:
+                try:
+                    returncode, stdout, stderr = await run_subprocess(cmd, METADATA_TIMEOUT_SECONDS)
+                except asyncio.TimeoutError:
+                    raise HTTPException(status_code=504, detail="Request timed out")
 
         if returncode != 0:
             stderr_text = stderr.decode()
@@ -334,14 +338,15 @@ async def run_conversion(job_id: str, url: str, quality: str):
         logger.info(f"[TIMING] Job {job_id}: yt-dlp command starting")
 
         async with conversion_semaphore:
-            try:
-                returncode, stdout, stderr = await run_subprocess(cmd, CONVERSION_TIMEOUT_SECONDS, log_output=True)
-                _end_time = _time.time()
-                logger.info(f"[TIMING] Job {job_id}: yt-dlp completed in {_end_time - _start_time:.1f}s, returncode={returncode}")
-            except asyncio.TimeoutError:
-                job['status'] = JobStatus.FAILED
-                job['error'] = "Conversion timed out"
-                return
+            async with ytdlp_semaphore:
+                try:
+                    returncode, stdout, stderr = await run_subprocess(cmd, CONVERSION_TIMEOUT_SECONDS, log_output=True)
+                    _end_time = _time.time()
+                    logger.info(f"[TIMING] Job {job_id}: yt-dlp completed in {_end_time - _start_time:.1f}s, returncode={returncode}")
+                except asyncio.TimeoutError:
+                    job['status'] = JobStatus.FAILED
+                    job['error'] = "Conversion timed out"
+                    return
 
         if returncode != 0:
             stderr_text = stderr.decode()
@@ -393,12 +398,19 @@ async def create_job(
 ):
     if not is_valid_youtube_url(url):
         raise HTTPException(status_code=400, detail="Invalid YouTube URL")
-    
+
     valid_qualities = ['128', '192', '256', '320']
     if quality not in valid_qualities:
         quality = '128'
-    
+
     cleanup_old_jobs()
+
+    active_jobs = sum(1 for j in jobs.values() if j['status'] in (JobStatus.PENDING, JobStatus.PROCESSING))
+    if active_jobs >= MAX_QUEUED_JOBS:
+        raise HTTPException(
+            status_code=503,
+            detail="Queue full, please try again in a few minutes"
+        )
     
     job_id = str(uuid.uuid4())
     jobs[job_id] = {
